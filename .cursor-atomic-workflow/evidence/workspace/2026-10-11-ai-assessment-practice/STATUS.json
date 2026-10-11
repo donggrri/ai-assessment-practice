@@ -1,0 +1,25 @@
+{
+  "slug": "ai-assessment-practice",
+  "shortRepo": "workspace",
+  "repo": "/workspace",
+  "worktree": null,
+  "cwd": "/workspace",
+  "branch": "main",
+  "phase": "review",
+  "artifacts": {
+    "explore": true,
+    "plan": true,
+    "tasks": true,
+    "review": true
+  },
+  "tasks": {
+    "total": 6,
+    "done": 6,
+    "blockedId": null,
+    "blockedReason": null
+  },
+  "lastCommand": "/exec-daemon/node /workspace/.cursor/skills/cursor-atomic-workflow/scripts/work-status.mjs sync ai-assessment-practice",
+  "sourceDocs": null,
+  "sessionId": "bc-17d36191-1acd-5937-b3a4-69081472c287",
+  "updatedAt": "2026-10-11T01:23:56.140Z"
+}

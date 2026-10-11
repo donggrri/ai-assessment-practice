@@ -1,0 +1,6 @@
+{
+  "ok": true,
+  "exitCode": 0,
+  "outputPath": "/workspace/.cursor-atomic-workflow/runs/workspace/ai-assessment-practice/tsc.done.json",
+  "command": "npx tsc --noEmit"
+}
