@@ -1,0 +1,174 @@
+import assert from "node:assert/strict";
+import { afterEach, describe, it } from "node:test";
+import { completeChat } from "./llm";
+
+const originalFetch = globalThis.fetch;
+
+type CompleteChatInput = Parameters<typeof completeChat>[0] & {
+  signal?: AbortSignal;
+};
+
+afterEach(() => {
+  globalThis.fetch = originalFetch;
+});
+
+describe("completeChat", () => {
+  it('성공: fetch가 200과 choices[0].message.content "안녕하세요"를 주면 "안녕하세요"를 반환한다', async () => {
+    const baseUrl = "https://api.example.com/v1";
+    const apiKey = "sk-test-key";
+    const model = "gpt-test";
+
+    globalThis.fetch = async (url, init) => {
+      assert.equal(url, `${baseUrl}/chat/completions`);
+      assert.equal(init?.method, "POST");
+      const headers = init?.headers as Record<string, string>;
+      assert.equal(headers.Authorization, `Bearer ${apiKey}`);
+      assert.equal(headers["Content-Type"], "application/json");
+
+      const body = JSON.parse(String(init?.body)) as {
+        model: string;
+        temperature: number;
+        messages: unknown[];
+      };
+      assert.equal(body.model, model);
+      assert.equal(body.temperature, 0.2);
+      assert.ok(Array.isArray(body.messages));
+
+      return new Response(
+        JSON.stringify({
+          choices: [{ message: { content: "안녕하세요" } }],
+        }),
+        { status: 200, headers: { "Content-Type": "application/json" } },
+      );
+    };
+
+    const result = await completeChat({
+      baseUrl,
+      apiKey,
+      model,
+      content: "질문",
+    });
+    assert.equal(result, "안녕하세요");
+  });
+
+  it("비 2xx: fetch가 500과 본문을 주면 상태 코드가 메시지에 포함되어 throw한다", async () => {
+    globalThis.fetch = async () =>
+      new Response("internal error", { status: 500 });
+
+    await assert.rejects(
+      () =>
+        completeChat({
+          baseUrl: "https://api.example.com/v1",
+          apiKey: "sk-test",
+          model: "gpt-test",
+          content: "질문",
+        }),
+      (err: unknown) => {
+        assert.ok(err instanceof Error);
+        assert.match(err.message, /500/);
+        return true;
+      },
+    );
+  });
+
+  it('빈 본문: choices[0].message.content가 ""이면 메시지에 "비어"가 포함되어 throw한다', async () => {
+    globalThis.fetch = async () =>
+      new Response(
+        JSON.stringify({
+          choices: [{ message: { content: "" } }],
+        }),
+        { status: 200, headers: { "Content-Type": "application/json" } },
+      );
+
+    await assert.rejects(
+      () =>
+        completeChat({
+          baseUrl: "https://api.example.com/v1",
+          apiKey: "sk-test",
+          model: "gpt-test",
+          content: "질문",
+        }),
+      (err: unknown) => {
+        assert.ok(err instanceof Error);
+        assert.match(err.message, /비어/);
+        return true;
+      },
+    );
+  });
+
+  it("빈 본문: choices[0].message.content가 없으면 메시지에 \"비어\"가 포함되어 throw한다", async () => {
+    globalThis.fetch = async () =>
+      new Response(
+        JSON.stringify({
+          choices: [{ message: {} }],
+        }),
+        { status: 200, headers: { "Content-Type": "application/json" } },
+      );
+
+    await assert.rejects(
+      () =>
+        completeChat({
+          baseUrl: "https://api.example.com/v1",
+          apiKey: "sk-test",
+          model: "gpt-test",
+          content: "질문",
+        }),
+      (err: unknown) => {
+        assert.ok(err instanceof Error);
+        assert.match(err.message, /비어/);
+        return true;
+      },
+    );
+  });
+
+  it("주입한 signal이 abort면 즉시 거절한다", async () => {
+    const controller = new AbortController();
+    controller.abort();
+    const signal = controller.signal;
+
+    let capturedSignal: AbortSignal | undefined;
+    globalThis.fetch = async (_url, init) => {
+      capturedSignal = init?.signal as AbortSignal | undefined;
+      return new Response(
+        JSON.stringify({
+          choices: [{ message: { content: "안녕하세요" } }],
+        }),
+        { status: 200, headers: { "Content-Type": "application/json" } },
+      );
+    };
+
+    const input: CompleteChatInput = {
+      baseUrl: "https://api.example.com/v1",
+      apiKey: "sk-test",
+      model: "gpt-test",
+      content: "질문",
+      signal,
+    };
+
+    const bounded = Promise.race([
+      completeChat(input),
+      new Promise<never>((_, reject) => {
+        setTimeout(
+          () => reject(new Error("completeChat이 500ms 안에 끝나지 않았다")),
+          500,
+        );
+      }),
+    ]);
+
+    await assert.rejects(() => bounded, (err: unknown) => {
+      assert.ok(err instanceof Error);
+      assert.equal(
+        err.name,
+        "AbortError",
+        "abort된 signal이면 AbortError로 즉시 거절되어야 한다",
+      );
+      return true;
+    });
+
+    assert.strictEqual(
+      capturedSignal,
+      signal,
+      "fetch에 전달된 signal은 호출자가 넘긴 signal과 같아야 한다",
+    );
+  });
+});

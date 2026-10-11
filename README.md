@@ -18,24 +18,26 @@ npm run lint
 
 ## 환경 변수
 
-`.env.example`을 `.env.local`로 복사해 바꿉니다. 값을 바꾸면 개발 서버를 다시 시작합니다.
+`.env.example`을 `.env.local`로 복사해 바꿉니다. 한도와 복사 방지는 빌드할 때 페이지에 구워집니다. 값을 바꾸면 개발 서버를 다시 시작하거나 다시 빌드합니다.
 
 | 변수 | 기본값 | 설명 |
 | --- | --- | --- |
-| `OPENAI_API_KEY` | 비어 있음 | 비어 있으면 모의 응답. 첨부 파일 이름, 글자 수, 받은 컨텍스트 요약만 돌려줍니다. |
-| `OPENAI_BASE_URL` | `https://api.openai.com/v1` | OpenAI 호환 API 주소 |
-| `OPENAI_MODEL` | `gpt-4o-mini` | 모델 이름 |
 | `CONTEXT_CHAR_LIMIT` | `20000` | 질문 + 공통 지문 + 선택한 문제 + 첨부 파일 본문의 글자 수 한도. 넘으면 전송이 막힙니다. |
 | `AI_REQUEST_LIMIT` | `10` | 응시당 AI 질문 횟수. 0이면 입력이 잠기고 「AI 질문 횟수를 모두 사용했습니다」가 나옵니다. |
 | `COPY_PROTECTION` | `true` | `false`면 지문·문제·파일 뷰어 복사를 허용합니다. |
+| `NEXT_PUBLIC_BASE_PATH` | `/ai-assessment-practice` | 사이트를 올릴 하위 경로. `npm run dev`는 빈 값으로 두어 `http://127.0.0.1:43123` 을 유지합니다. 빈 문자열이면 경로 접두사가 없습니다. |
 
-키는 브라우저로 내려가지 않습니다. AI에게는 공통 지문, 선택한 문제, 첨부한 파일 본문, 이번 질문만 갑니다. 첨부하지 않은 파일은 포함되지 않고, 이전 대화도 다시 보내지 않습니다.
+API 키, 주소, 모델은 환경 변수로 넣지 않습니다. 화면 상단의 「AI 설정」에 적으면 이 브라우저의 `localStorage`에만 저장되고, 질문할 때 브라우저가 그 주소로 직접 요청합니다. 키가 없으면 모의 응답입니다. 첨부 파일 이름, 글자 수, 받은 컨텍스트 요약만 돌려줍니다.
 
-답안과 대화는 이 브라우저의 로컬 저장소에 남습니다. 화면에는 대화를 지우는 버튼이 없습니다. 새 응시는 답안과 질문 횟수만 다시 채웁니다.
+AI에게는 공통 지문, 선택한 문제, 첨부한 파일 본문, 이번 질문만 갑니다. 첨부하지 않은 파일은 포함되지 않고, 이전 대화도 다시 보내지 않습니다.
+
+질문 횟수, 글자 수 한도, 복사 방지는 브라우저 안의 제한입니다. 저장값을 고치면 우회할 수 있습니다.
+
+답안과 대화, AI 설정도 이 브라우저의 로컬 저장소에 남습니다. 화면에는 대화를 지우는 버튼이 없습니다. 새 응시는 답안과 질문 횟수만 다시 채웁니다. 설정에는 키를 지우는 버튼이 있습니다.
 
 ## 문제 세트 추가
 
-`data/problem-sets/`에 JSON 파일을 넣으면 서버가 그 폴더의 `*.json`을 모두 읽습니다. 인덱스 수정은 필요 없습니다.
+`data/problem-sets/`에 JSON 파일을 넣으면 빌드가 그 폴더의 `*.json`을 모두 읽어 정적 페이지에 넣습니다. 인덱스 수정은 필요 없습니다. 파일을 바꾼 뒤에는 다시 빌드합니다.
 
 ```json
 {
@@ -72,23 +74,19 @@ npm run lint
 
 들어 있는 샘플은 `건강기능식품 입점 심사`입니다. 1~4번은 주관식이고, 5번은 객관식 연습입니다. 정답과 해설은 채점 후에만 화면에 나옵니다.
 
-## 폰에서 배포
+정적 배포에서는 채점이 브라우저에서 이루어지므로 정답과 해설이 JavaScript 번들에 포함됩니다. 페이지 소스를 열면 채점 전에도 정답을 볼 수 있습니다. 이 사이트는 연습용이며, 정답 유출을 막는 장치가 아닙니다.
 
-이 저장소는 Origin Git에 있습니다. Vercel은 Origin 저장소를 Git 연동으로 받지 않으므로, 클론한 디렉터리에서 Vercel CLI로 올리는 방법이 가장 짧습니다. [Vercel Hobby](https://vercel.com/docs/plans/hobby)는 개인 프로젝트에 무료입니다.
+## GitHub Pages
 
-```bash
-npm install
-npx vercel login
-npx vercel link
-npx vercel env add OPENAI_API_KEY production
-npx vercel deploy --prod
-```
+`main`에 푸시하면 `.github/workflows/pages.yml`이 정적 파일(`out/`)을 만들어 GitHub Pages에 올립니다. 프로젝트 사이트 주소는 `https://<사용자>.github.io/ai-assessment-practice/` 입니다. 이 저장소의 예상 주소는 [https://donggrri.github.io/ai-assessment-practice/](https://donggrri.github.io/ai-assessment-practice/) 입니다.
 
-`OPENAI_API_KEY` 이름은 `NEXT_PUBLIC_`으로 시작하지 않습니다. 그 값은 서버의 `lib/config.ts`와 채팅 Route Handler만 읽고, 브라우저로 내려가는 설정(`/api/config`)에는 키가 없습니다. 프리뷰에도 같은 키를 쓰려면 `npx vercel env add OPENAI_API_KEY preview`를 한 번 더 실행합니다.
+사이트가 비어 있거나 배포 작업이 실패하면 저장소 Settings → Pages → Build and deployment → Source를 **GitHub Actions**로 맞춥니다. 이 저장소의 공개 범위와 Pages 설정은 워크플로가 바꾸지 않습니다.
 
-키를 넣지 않고 배포하면 로컬과 같이 모의 응답으로 동작합니다. `OPENAI_BASE_URL`, `OPENAI_MODEL`, `CONTEXT_CHAR_LIMIT`, `AI_REQUEST_LIMIT`, `COPY_PROTECTION`도 같은 명령으로 바꿀 수 있고, 비우면 README 표의 기본값을 씁니다.
+다른 저장소 이름으로 포크했다면 빌드 전에 `NEXT_PUBLIC_BASE_PATH`를 `/저장소이름`으로 설정합니다. `"/"`는 쓸 수 없습니다.
 
-Origin에 푸시한 뒤 사이트에 반영하려면 클론을 최신으로 맞춘 다음 `npx vercel deploy --prod`를 다시 실행합니다. `.vercel/`과 `.env.local`은 커밋하지 않습니다.
+실제 모델을 쓰려면 배포된 사이트의 「AI 설정」에 OpenAI 호환 주소, 모델, API 키를 입력합니다. 키는 저장소와 빌드 산출물에 들어가지 않습니다. 일부 호환 서버는 브라우저의 CORS를 막습니다. HTTPS 페이지에서 `http://` 주소(localhost 제외)는 브라우저가 막을 수 있습니다.
+
+로컬에서 정적 결과를 보려면 `npm run build` 뒤 `out/`을 정적 서버로 열고, 기본 경로 `/ai-assessment-practice/` 아래에서 확인합니다. `npm start`는 정적 export와 맞지 않아 없습니다.
 
 ## 화면
 

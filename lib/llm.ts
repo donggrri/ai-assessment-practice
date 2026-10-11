@@ -11,8 +11,12 @@ export async function completeChat(input: {
   apiKey: string;
   model: string;
   content: string;
+  signal?: AbortSignal;
+  fetchImpl?: typeof fetch;
 }): Promise<string> {
-  const response = await fetch(`${input.baseUrl}/chat/completions`, {
+  const fetchFn = input.fetchImpl ?? fetch;
+  const signal = input.signal ?? AbortSignal.timeout(45_000);
+  const responsePromise = fetchFn(`${input.baseUrl}/chat/completions`, {
     method: "POST",
     headers: {
       Authorization: `Bearer ${input.apiKey}`,
@@ -26,8 +30,12 @@ export async function completeChat(input: {
         { role: "user", content: input.content },
       ],
     }),
-    signal: AbortSignal.timeout(45_000),
+    signal,
   });
+  if (input.signal?.aborted) {
+    throw new DOMException("The operation was aborted.", "AbortError");
+  }
+  const response = await responsePromise;
   if (!response.ok) {
     const detail = await response.text();
     throw new Error(`모델 요청 실패 (${response.status}): ${detail.slice(0, 280)}`);

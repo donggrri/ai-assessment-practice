@@ -80,10 +80,13 @@ export type ChatMessage = {
   };
 };
 
-export type ExamClientConfig = {
+export type BuildConfig = {
   contextCharLimit: number;
   aiRequestLimit: number;
   copyProtection: boolean;
+};
+
+export type ExamClientConfig = BuildConfig & {
   mockMode: boolean;
   model: string;
 };

@@ -11,7 +11,7 @@ export function buildMockReply(input: {
 }): string {
   const fileTokens = input.files.reduce((sum, file) => sum + estimateTokens(file.content), 0);
   const lines = [
-    "모의 응답입니다. OPENAI_API_KEY가 없어 모델을 호출하지 않았습니다.",
+    "모의 응답입니다. API 키가 없어 모델을 호출하지 않았습니다. 설정 화면에서 API 키를 입력하면 실제 모델을 호출합니다.",
     "",
     "받은 컨텍스트",
     `- 공통 지문 ${input.passageChars.toLocaleString("ko-KR")}자`,
@@ -34,7 +34,7 @@ export function buildMockReply(input: {
     "질문 앞부분",
     input.message.trim().slice(0, 500),
     "",
-    "첨부하지 않은 파일 내용은 이 응답에 포함되지 않았습니다. 실제 모델을 쓰려면 OPENAI_API_KEY를 설정한 뒤 서버를 다시 시작하세요.",
+    "첨부하지 않은 파일 내용은 이 응답에 포함되지 않았습니다. 실제 모델을 쓰려면 설정 화면에서 API 키를 입력하세요.",
   ];
   return lines.join("\n");
 }

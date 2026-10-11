@@ -21,7 +21,9 @@ export function AiPane() {
       <div className="ai-head">
         <h2>AI 어시스트</h2>
         <p>
-          {exam.config.mockMode ? "모의 응답 모드입니다. " : `${exam.config.model}에 질문합니다. `}
+          {exam.config.mockMode
+            ? "모의 응답 모드입니다. 헤더의 AI 설정에서 API 키를 저장하면 선택한 모델에 질문합니다. "
+            : `${exam.config.model}에 질문합니다. `}
           첨부한 파일과 고른 문제, 공통 지문, 이번 질문만 전달됩니다.
         </p>
       </div>

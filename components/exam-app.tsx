@@ -2,8 +2,25 @@
 
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { measureContext } from "@/lib/context";
+import { createExamEngine } from "@/lib/exam-engine";
+import {
+  clearLlmSettings,
+  isMockMode,
+  loadLlmSettings,
+  normalizeBaseUrl,
+  saveLlmSettings,
+} from "@/lib/llm-settings";
 import { remainingRequests } from "@/lib/requests";
-import type { ChatMessage, ExamClientConfig, GradeReport, ProblemSetSummary, PublicProblemSet } from "@/lib/types";
+import { toPublicProblemSet, toSummary } from "@/lib/public-problem";
+import type {
+  BuildConfig,
+  ChatMessage,
+  ExamClientConfig,
+  GradeReport,
+  ProblemSet,
+  ProblemSetSummary,
+  PublicProblemSet,
+} from "@/lib/types";
 import { AiPane } from "./ai-pane";
 import { ExamProvider, type MobilePane } from "./exam-context";
 import { MaterialsPane } from "./materials-pane";
@@ -12,7 +29,34 @@ import { loadExam, saveExam } from "./storage";
 import { TOUR_STEPS, TourOverlay } from "./tour-overlay";
 import { WorkspacePane } from "./workspace-pane";
 
-export function ExamApp() {
+const DEFAULT_MODEL = "gpt-4o-mini";
+
+const SETTINGS_STORAGE_ERROR =
+  "이 브라우저에 설정을 저장하지 못했습니다. 질문에는 모의 응답이 사용됩니다.";
+
+type ExamAppProps = {
+  sets?: ProblemSet[];
+  buildConfig?: BuildConfig;
+};
+
+type SettingsDraft = {
+  apiKey: string;
+  baseUrl: string;
+  model: string;
+};
+
+function isInsecureRemoteHttp(baseUrl: string): boolean {
+  const trimmed = baseUrl.trim();
+  if (!trimmed.toLowerCase().startsWith("http://")) return false;
+  try {
+    const host = new URL(trimmed).hostname;
+    return host !== "localhost" && host !== "127.0.0.1";
+  } catch {
+    return false;
+  }
+}
+
+export function ExamApp({ sets: serverSets, buildConfig }: ExamAppProps) {
   const [config, setConfig] = useState<ExamClientConfig | null>(null);
   const [summaries, setSummaries] = useState<ProblemSetSummary[]>([]);
   const [problem, setProblem] = useState<PublicProblemSet | null>(null);
@@ -40,76 +84,117 @@ export function ExamApp() {
   const [gradeError, setGradeError] = useState<string | null>(null);
   const [saveFlash, setSaveFlash] = useState(false);
   const [newAttemptOpen, setNewAttemptOpen] = useState(false);
+  const [settingsOpen, setSettingsOpen] = useState(false);
+  const [settingsStorageError, setSettingsStorageError] = useState<string | null>(null);
+  const [settingsDraft, setSettingsDraft] = useState<SettingsDraft>({
+    apiKey: "",
+    baseUrl: "https://api.openai.com/v1",
+    model: DEFAULT_MODEL,
+  });
   const flashTimer = useRef<number | null>(null);
 
-  const loadSet = useCallback(async (id: string) => {
-    setLoading(true);
-    setError(null);
-    setHydrated(false);
-    try {
-      const response = await fetch(`/api/problem-sets/${encodeURIComponent(id)}`);
-      if (!response.ok) throw new Error("load");
-      const data = (await response.json()) as PublicProblemSet;
-      const stored = loadExam(id);
-      const questionIds = new Set(data.questions.map((question) => question.id));
-      const fileIds = new Set(data.files.map((file) => file.id));
-      setProblem(data);
-      setSetId(id);
-      setSaved(stored?.saved ?? {});
-      setDrafts(stored?.drafts ?? {});
-      setActiveQuestionId(
-        stored?.activeQuestionId && questionIds.has(stored.activeQuestionId)
-          ? stored.activeQuestionId
-          : data.questions[0].id,
+  const engine = useMemo(() => {
+    if (!serverSets || !buildConfig) return null;
+    return createExamEngine({
+      sets: serverSets,
+      config: buildConfig,
+      readSettings: () => loadLlmSettings(),
+      fetchImpl: globalThis.fetch,
+    });
+  }, [serverSets, buildConfig]);
+
+  const applyLlmToConfig = useCallback(
+    (settings: ReturnType<typeof loadLlmSettings>) => {
+      setConfig((prev) =>
+        prev
+          ? {
+              ...prev,
+              mockMode: isMockMode(settings),
+              model: settings.model,
+            }
+          : prev,
       );
-      setViewerFileId(stored?.viewerFileId && fileIds.has(stored.viewerFileId) ? stored.viewerFileId : null);
-      setAttachedFileIds((stored?.attachedFileIds ?? []).filter((fileId) => fileIds.has(fileId)));
-      setChatQuestionId(
-        stored?.chatQuestionId && questionIds.has(stored.chatQuestionId) ? stored.chatQuestionId : null,
-      );
-      setMessages(Array.isArray(stored?.messages) ? stored.messages : []);
-      setRequestsUsed(typeof stored?.requestsUsed === "number" ? stored.requestsUsed : 0);
-      setReport(stored?.report ?? null);
-      setView(stored?.view === "result" ? "result" : "exam");
-      setChatDraft("");
-      setChatError(null);
-      setHydrated(true);
-      setLoading(false);
-    } catch {
-      setError("문제 세트를 불러오지 못했습니다.");
-      setLoading(false);
-    }
-  }, []);
+    },
+    [],
+  );
+
+  const loadSet = useCallback(
+    async (id: string) => {
+      if (!serverSets) return;
+      setLoading(true);
+      setError(null);
+      setHydrated(false);
+      try {
+        const full = serverSets.find((set) => set.id === id);
+        if (!full) throw new Error("load");
+        const data = toPublicProblemSet(full);
+        const stored = loadExam(id);
+        const questionIds = new Set(data.questions.map((question) => question.id));
+        const fileIds = new Set(data.files.map((file) => file.id));
+        setProblem(data);
+        setSetId(id);
+        setSaved(stored?.saved ?? {});
+        setDrafts(stored?.drafts ?? {});
+        setActiveQuestionId(
+          stored?.activeQuestionId && questionIds.has(stored.activeQuestionId)
+            ? stored.activeQuestionId
+            : data.questions[0].id,
+        );
+        setViewerFileId(stored?.viewerFileId && fileIds.has(stored.viewerFileId) ? stored.viewerFileId : null);
+        setAttachedFileIds((stored?.attachedFileIds ?? []).filter((fileId) => fileIds.has(fileId)));
+        setChatQuestionId(
+          stored?.chatQuestionId && questionIds.has(stored.chatQuestionId) ? stored.chatQuestionId : null,
+        );
+        setMessages(Array.isArray(stored?.messages) ? stored.messages : []);
+        setRequestsUsed(typeof stored?.requestsUsed === "number" ? stored.requestsUsed : 0);
+        setReport(stored?.report ?? null);
+        setView(stored?.view === "result" ? "result" : "exam");
+        setChatDraft("");
+        setChatError(null);
+        setHydrated(true);
+        setLoading(false);
+      } catch {
+        setError("문제 세트를 불러오지 못했습니다.");
+        setLoading(false);
+      }
+    },
+    [serverSets],
+  );
 
   useEffect(() => {
     let cancel = false;
     (async () => {
-      try {
-        const [configResponse, listResponse] = await Promise.all([
-          fetch("/api/config"),
-          fetch("/api/problem-sets"),
-        ]);
-        if (!configResponse.ok || !listResponse.ok) throw new Error("boot");
-        const nextConfig = (await configResponse.json()) as ExamClientConfig;
-        const list = (await listResponse.json()) as { sets: ProblemSetSummary[] };
-        if (cancel) return;
-        setConfig(nextConfig);
-        setSummaries(list.sets ?? []);
-        const wanted = new URLSearchParams(window.location.search).get("set");
-        const id = (list.sets ?? []).find((item) => item.id === wanted)?.id ?? list.sets?.[0]?.id;
-        if (!id) throw new Error("empty");
-        await loadSet(id);
-      } catch {
+      if (!serverSets || !buildConfig) {
         if (!cancel) {
           setError("문제 세트를 불러오지 못했습니다.");
           setLoading(false);
         }
+        return;
       }
+
+      const settings = loadLlmSettings();
+      const bootSummaries = serverSets.map(toSummary);
+
+      if (cancel) return;
+      setConfig({
+        ...buildConfig,
+        mockMode: isMockMode(settings),
+        model: settings.model,
+      });
+      setSummaries(bootSummaries);
+      const wanted = new URLSearchParams(window.location.search).get("set");
+      const id = bootSummaries.find((item) => item.id === wanted)?.id ?? bootSummaries[0]?.id;
+      if (!id) {
+        setError("문제 세트를 불러오지 못했습니다.");
+        setLoading(false);
+        return;
+      }
+      await loadSet(id);
     })();
     return () => {
       cancel = true;
     };
-  }, [loadSet]);
+  }, [loadSet, serverSets, buildConfig]);
 
   useEffect(() => {
     if (!hydrated || !setId) return;
@@ -165,6 +250,41 @@ export function ExamApp() {
   const remaining = config ? remainingRequests(requestsUsed, config.aiRequestLimit) : 0;
   const locked = report != null;
 
+  function openSettings() {
+    setSettingsDraft(loadLlmSettings());
+    setSettingsStorageError(null);
+    setSettingsOpen(true);
+  }
+
+  function persistSettings() {
+    const next = {
+      apiKey: settingsDraft.apiKey,
+      baseUrl: normalizeBaseUrl(settingsDraft.baseUrl),
+      model: settingsDraft.model.trim() || DEFAULT_MODEL,
+    };
+    const saved: { ok: true } | { ok: false } = saveLlmSettings(next);
+    if (saved.ok === false) {
+      setSettingsStorageError(SETTINGS_STORAGE_ERROR);
+      return;
+    }
+    setSettingsStorageError(null);
+    applyLlmToConfig(next);
+    setSettingsDraft(next);
+    setSettingsOpen(false);
+  }
+
+  function removeSettings() {
+    const cleared: { ok: true } | { ok: false } = clearLlmSettings();
+    if (cleared.ok === false) {
+      setSettingsStorageError(SETTINGS_STORAGE_ERROR);
+      return;
+    }
+    setSettingsStorageError(null);
+    const defaults = loadLlmSettings();
+    setSettingsDraft(defaults);
+    applyLlmToConfig(defaults);
+  }
+
   function selectQuestion(id: string) {
     setActiveQuestionId(id);
     setMobilePane("work");
@@ -194,35 +314,21 @@ export function ExamApp() {
   }
 
   async function sendChat() {
-    if (!problem || !config || locked || sending) return;
+    if (!problem || !config || !engine || locked || sending) return;
     if (chatDraft.trim() === "" || measurement.over || remaining === 0) return;
     setSending(true);
     setChatError(null);
     try {
-      const response = await fetch("/api/chat", {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({
-          problemSetId: problem.id,
-          questionId: chatQuestionId,
-          fileIds: attachedFileIds,
-          message: chatDraft,
-          requestsUsed,
-        }),
+      const data = await engine.send({
+        problemSetId: problem.id,
+        questionId: chatQuestionId ?? "",
+        fileIds: attachedFileIds,
+        message: chatDraft,
+        requestsUsed,
       });
-      const data = (await response.json()) as {
-        error?: string;
-        message?: string;
-        reply?: string;
-        mock?: boolean;
-        charCount?: number;
-        requestsUsed?: number;
-        questionNumber?: number | null;
-        fileNames?: string[];
-      };
-      if (!response.ok) {
+      if (!data.ok) {
         if (data.error === "request_limit") setRequestsUsed(config.aiRequestLimit);
-        setChatError(data.message ?? "전송하지 못했습니다.");
+        setChatError(data.message);
         return;
       }
       const userMessage: ChatMessage = {
@@ -249,7 +355,7 @@ export function ExamApp() {
         },
       };
       setMessages((prev) => [...prev, userMessage, assistant]);
-      if (typeof data.requestsUsed === "number") setRequestsUsed(data.requestsUsed);
+      setRequestsUsed(data.requestsUsed);
       setChatDraft("");
     } catch {
       setChatError("네트워크 오류로 보내지 못했습니다. 횟수는 차감되지 않았습니다.");
@@ -268,21 +374,16 @@ export function ExamApp() {
   }
 
   async function confirmGrade() {
-    if (!problem || grading) return;
+    if (!problem || !engine || grading) return;
     const answers = mergedAnswers();
     setSaved(answers);
     setDrafts(answers);
     setGrading(true);
     setGradeError(null);
     try {
-      const response = await fetch("/api/grade", {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ problemSetId: problem.id, answers }),
-      });
-      const data = (await response.json()) as GradeReport & { message?: string };
-      if (!response.ok) {
-        setGradeError(data.message ?? "채점에 실패했습니다.");
+      const data = engine.grade(problem.id, answers);
+      if ("error" in data) {
+        setGradeError(data.message);
         return;
       }
       setReport(data);
@@ -382,6 +483,8 @@ export function ExamApp() {
     },
   };
 
+  const settingsInsecure = isInsecureRemoteHttp(settingsDraft.baseUrl);
+
   return (
     <ExamProvider value={api}>
       <div className="shell">
@@ -409,6 +512,9 @@ export function ExamApp() {
             <span className={`pill ${remaining === 0 ? "warn" : ""}`} data-testid="remaining-requests">
               남은 AI 질문 {remaining}회
             </span>
+            <button type="button" className="btn ghost" onClick={openSettings}>
+              AI 설정
+            </button>
             <button type="button" className="btn ghost" onClick={startTour}>
               둘러보기
             </button>
@@ -464,6 +570,63 @@ export function ExamApp() {
           </>
         )}
       </div>
+      {settingsOpen ? (
+        <div className="modal-backdrop">
+          <div className="modal" role="dialog" aria-modal="true" aria-labelledby="settings-title">
+            <h2 id="settings-title">AI 설정</h2>
+            <p>
+              이 브라우저에만 저장되며 저장소나 빌드에 포함되지 않습니다. 질문할 때 입력한 주소로 직접 전송됩니다.
+            </p>
+            <div className="composer" style={{ marginTop: 12 }}>
+              <label htmlFor="llm-api-key">API 키</label>
+              <input
+                id="llm-api-key"
+                type="password"
+                autoComplete="off"
+                value={settingsDraft.apiKey}
+                onChange={(event) => setSettingsDraft((prev) => ({ ...prev, apiKey: event.target.value }))}
+              />
+              <label htmlFor="llm-base-url" style={{ marginTop: 8 }}>주소</label>
+              <input
+                id="llm-base-url"
+                type="text"
+                autoComplete="off"
+                value={settingsDraft.baseUrl}
+                onChange={(event) => setSettingsDraft((prev) => ({ ...prev, baseUrl: event.target.value }))}
+              />
+              {settingsInsecure ? (
+                <p className="warn" role="alert">
+                  http 주소는 로컬이 아니면 API 키가 노출될 수 있습니다. 가능하면 https를 사용하세요.
+                </p>
+              ) : null}
+              <label htmlFor="llm-model" style={{ marginTop: 8 }}>모델</label>
+              <input
+                id="llm-model"
+                type="text"
+                autoComplete="off"
+                value={settingsDraft.model}
+                onChange={(event) => setSettingsDraft((prev) => ({ ...prev, model: event.target.value }))}
+              />
+            </div>
+            {settingsStorageError ? (
+              <p className="warn" role="alert">
+                {settingsStorageError}
+              </p>
+            ) : null}
+            <div className="modal-actions">
+              <button type="button" className="btn" onClick={removeSettings}>
+                삭제
+              </button>
+              <button type="button" className="btn" onClick={() => setSettingsOpen(false)}>
+                취소
+              </button>
+              <button type="button" className="btn primary" onClick={persistSettings}>
+                저장
+              </button>
+            </div>
+          </div>
+        </div>
+      ) : null}
       {gradeOpen ? (
         <div className="modal-backdrop">
           <div className="modal" role="dialog" aria-modal="true" aria-labelledby="grade-title">
