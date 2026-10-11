@@ -1,0 +1,141 @@
+
+> ai-assessment-practice@0.1.0 test
+> tsx --test lib/*.test.ts
+
+TAP version 13
+# Subtest: decideChat
+    # Subtest: 첨부한 파일과 고른 문제만 넣고 횟수를 1 소모한다
+    ok 1 - 첨부한 파일과 고른 문제만 넣고 횟수를 1 소모한다
+      ---
+      duration_ms: 0.829251
+      ...
+    # Subtest: 문제를 고르지 않으면 문제 본문을 보내지 않는다
+    ok 2 - 문제를 고르지 않으면 문제 본문을 보내지 않는다
+      ---
+      duration_ms: 0.147403
+      ...
+    # Subtest: 글자 수가 한도를 넘으면 전송을 막고 횟수를 줄이지 않는다
+    ok 3 - 글자 수가 한도를 넘으면 전송을 막고 횟수를 줄이지 않는다
+      ---
+      duration_ms: 0.141385
+      ...
+    # Subtest: 남은 횟수가 0이면 입력에 해당하는 요청을 거절한다
+    ok 4 - 남은 횟수가 0이면 입력에 해당하는 요청을 거절한다
+      ---
+      duration_ms: 0.209817
+      ...
+    1..4
+ok 1 - decideChat
+  ---
+  duration_ms: 2.013019
+  type: 'suite'
+  ...
+# Subtest: contextCharCount
+    # Subtest: 지문, 선택 문제, 첨부 파일, 질문 글자만 더한다
+    ok 1 - 지문, 선택 문제, 첨부 파일, 질문 글자만 더한다
+      ---
+      duration_ms: 0.928716
+      ...
+    # Subtest: 문제를 고르지 않으면 문제 본문을 세지 않고 프롬프트에도 넣지 않는다
+    ok 2 - 문제를 고르지 않으면 문제 본문을 세지 않고 프롬프트에도 넣지 않는다
+      ---
+      duration_ms: 0.186849
+      ...
+    # Subtest: 넘긴 파일만 포함하고 한도 초과를 표시한다
+    ok 3 - 넘긴 파일만 포함하고 한도 초과를 표시한다
+      ---
+      duration_ms: 0.189588
+      ...
+    # Subtest: 한도와 같으면 초과가 아니다
+    ok 4 - 한도와 같으면 초과가 아니다
+      ---
+      duration_ms: 0.139141
+      ...
+    1..4
+ok 2 - contextCharCount
+  ---
+  duration_ms: 2.390658
+  type: 'suite'
+  ...
+# Subtest: normalizeAnswer
+    # Subtest: 공백과 전각 쉼표, 대소문자를 무시한다
+    ok 1 - 공백과 전각 쉼표, 대소문자를 무시한다
+      ---
+      duration_ms: 0.875212
+      ...
+    1..1
+ok 3 - normalizeAnswer
+  ---
+  duration_ms: 1.717103
+  type: 'suite'
+  ...
+# Subtest: gradeProblemSet
+    # Subtest: 공백을 무시한 주관식과 객관식을 맞힌다
+    ok 1 - 공백을 무시한 주관식과 객관식을 맞힌다
+      ---
+      duration_ms: 0.444685
+      ...
+    # Subtest: 빈 답, 순서 불일치, 다른 보기는 오답이다
+    ok 2 - 빈 답, 순서 불일치, 다른 보기는 오답이다
+      ---
+      duration_ms: 0.303329
+      ...
+    # Subtest: 숫자 뒤에 단위를 붙이면 오답이다
+    ok 3 - 숫자 뒤에 단위를 붙이면 오답이다
+      ---
+      duration_ms: 0.190828
+      ...
+    1..3
+ok 4 - gradeProblemSet
+  ---
+  duration_ms: 1.14499
+  type: 'suite'
+  ...
+# Subtest: 건강기능식품 입점 심사 정답
+    # Subtest: 검수 기록 표가 규칙 판정에 쓴 상품과 같다
+    ok 1 - 검수 기록 표가 규칙 판정에 쓴 상품과 같다
+      ---
+      duration_ms: 0.589317
+      ...
+    # Subtest: 독립 규칙으로 계산한 답이 문제 세트의 정답과 같다
+    ok 2 - 독립 규칙으로 계산한 답이 문제 세트의 정답과 같다
+      ---
+      duration_ms: 0.722911
+      ...
+    # Subtest: 정답지로 채점하면 만점이고, 공개 문제에는 정답이 없다
+    ok 3 - 정답지로 채점하면 만점이고, 공개 문제에는 정답이 없다
+      ---
+      duration_ms: 0.656918
+      ...
+    1..3
+ok 5 - 건강기능식품 입점 심사 정답
+  ---
+  duration_ms: 2.634279
+  type: 'suite'
+  ...
+# Subtest: request limit
+    # Subtest: 남은 횟수를 보여주고 0이면 보낼 수 없다
+    ok 1 - 남은 횟수를 보여주고 0이면 보낼 수 없다
+      ---
+      duration_ms: 0.800747
+      ...
+    # Subtest: 성공하면 1 줄고, 한도에 닿으면 거절한다
+    ok 2 - 성공하면 1 줄고, 한도에 닿으면 거절한다
+      ---
+      duration_ms: 0.222242
+      ...
+    1..2
+ok 6 - request limit
+  ---
+  duration_ms: 1.992696
+  type: 'suite'
+  ...
+1..6
+# tests 17
+# suites 6
+# pass 17
+# fail 0
+# cancelled 0
+# skipped 0
+# todo 0
+# duration_ms 376.828299

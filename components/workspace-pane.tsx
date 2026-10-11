@@ -83,7 +83,7 @@ export function WorkspacePane() {
             {file ? (
               <MarkdownBody content={file.content} />
             ) : (
-              <p className="empty-chat">왼쪽 파일 목록에서 파일을 선택하면 내용이 여기에 열립니다.</p>
+              <p className="empty-chat">파일 목록에서 파일을 선택하면 내용이 여기에 열립니다.</p>
             )}
           </CopyGuard>
         </section>

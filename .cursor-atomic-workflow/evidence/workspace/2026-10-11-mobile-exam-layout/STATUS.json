@@ -1,0 +1,25 @@
+{
+  "slug": "mobile-exam-layout",
+  "shortRepo": "workspace",
+  "repo": "/workspace",
+  "worktree": null,
+  "cwd": "/workspace",
+  "branch": "main",
+  "phase": "review",
+  "artifacts": {
+    "explore": true,
+    "plan": true,
+    "tasks": true,
+    "review": true
+  },
+  "tasks": {
+    "total": 4,
+    "done": 4,
+    "blockedId": null,
+    "blockedReason": null
+  },
+  "lastCommand": "/exec-daemon/node /workspace/.cursor/skills/cursor-atomic-workflow/scripts/work-status.mjs sync mobile-exam-layout",
+  "sourceDocs": null,
+  "sessionId": "bc-17d36191-1acd-5937-b3a4-69081472c287",
+  "updatedAt": "2026-10-11T01:52:29.899Z"
+}

@@ -162,20 +162,26 @@ button:disabled, textarea:disabled, input:disabled, select:disabled {
   display: grid;
   grid-template-columns: repeat(3, 1fr);
   background: #fff;
-  border-bottom: 1px solid var(--line);
+  border-top: 1px solid var(--line);
+  flex: none;
+  z-index: 30;
+  padding-bottom: env(safe-area-inset-bottom, 0px);
 }
 
 .mobile-tabs button {
   border: 0;
   background: transparent;
-  padding: 10px;
-  font-weight: 600;
+  min-height: 44px;
+  padding: 8px 4px;
+  font-size: 13px;
+  font-weight: 700;
+  line-height: 1.2;
   color: var(--muted);
 }
 
 .mobile-tabs button.active {
   color: var(--tide-deep);
-  box-shadow: inset 0 -2px 0 var(--tide);
+  box-shadow: inset 0 2px 0 var(--tide);
 }
 
 .panes { flex: 1; min-height: 0; display: flex; }
@@ -391,7 +397,7 @@ button:disabled, textarea:disabled, input:disabled, select:disabled {
   padding: 3px 8px;
   font-size: 12px;
 }
-.chip button { border: 0; background: transparent; font-weight: 700; padding: 0 2px; }
+.chip-x { border: 0; background: transparent; font-weight: 700; padding: 0 4px; line-height: 1; }
 .counter { margin: 8px 0; font-size: 12px; color: var(--muted); font-variant-numeric: tabular-nums; }
 .counter.over { color: var(--bad); font-weight: 700; }
 .counter.near { color: var(--amber); font-weight: 700; }
@@ -434,6 +440,7 @@ button:disabled, textarea:disabled, input:disabled, select:disabled {
   flex-wrap: wrap;
 }
 .score-num { margin: 0; font-size: 48px; font-weight: 700; letter-spacing: -0.04em; }
+.result-actions { display: flex; gap: 8px; flex-wrap: wrap; }
 .score-kicker { margin: 0; color: var(--muted); font-size: 13px; font-weight: 700; }
 .result-list { max-width: 880px; margin: 0 auto; display: flex; flex-direction: column; gap: 12px; }
 .result-card { border: 1px solid var(--line); border-radius: 12px; padding: 14px 16px; box-shadow: var(--shadow); }
@@ -494,7 +501,12 @@ button:disabled, textarea:disabled, input:disabled, select:disabled {
 .exam-md th, .exam-md td { border: 1px solid var(--line); padding: 6px 8px; text-align: left; vertical-align: top; white-space: nowrap; }
 .exam-md th { background: #f4f7fb; }
 
-.copy-guard, .copy-guard * { user-select: none; -webkit-user-select: none; }
+.copy-guard, .copy-guard * {
+  user-select: none;
+  -webkit-user-select: none;
+  -webkit-touch-callout: none;
+  -moz-user-select: none;
+}
 
 @media (hover: hover) and (pointer: fine) {
   .attach-btn { opacity: 0; }
@@ -508,6 +520,49 @@ button:disabled, textarea:disabled, input:disabled, select:disabled {
   .panes { display: grid; grid-template-columns: 300px minmax(0, 1fr) 380px; }
   .pane { display: flex; }
   .pane-left, .pane-main, .pane-ai { min-height: 0; }
+}
+
+@media (max-width: 1023px) {
+  .header { padding: 8px 12px; gap: 8px; }
+  .brand h1 { font-size: 15px; }
+  .header-actions { width: 100%; }
+  .header-actions .btn,
+  .q-item,
+  .file-open,
+  .attach-btn,
+  .choice,
+  .answer-row input[type="text"],
+  .answer-row .btn,
+  .composer select,
+  .composer textarea,
+  .send-row .btn,
+  .modal-actions .btn,
+  .result-actions .btn,
+  .tour-actions .btn,
+  .chip-x {
+    min-height: 44px;
+  }
+  .chip-x { min-width: 44px; }
+  .choice { align-items: center; }
+  .answer-row, .send-row, .modal-actions, .tour-actions, .viewer-bar { flex-wrap: wrap; }
+  .answer-row .note { flex: 1 1 160px; }
+  .file-name, .viewer-bar strong, .result-card h3, .pair strong { overflow-wrap: anywhere; }
+  .pair { grid-template-columns: 4.5rem minmax(0, 1fr); }
+  .pane-left.active { overflow: auto; }
+  .section.questions, .section.files { max-height: none; }
+  .section.questions .scroll, .section.files .scroll { max-height: 240px; }
+  .section.grow { flex: 1 0 auto; min-height: 140px; }
+  .pane-ai.active { overflow: auto; }
+  .pane-ai .thread { flex: 1 0 180px; min-height: 160px; }
+  .pane-ai .composer { max-height: none; overflow: visible; }
+  .viewer { flex: 1 0 auto; min-height: 240px; }
+  .viewer-body { -webkit-overflow-scrolling: touch; }
+  .result { padding: 12px 12px calc(24px + env(safe-area-inset-bottom, 0px)); }
+  .score-hero { padding: 16px; align-items: stretch; }
+  .result-actions { width: 100%; }
+  .result-actions .btn { flex: 1 1 140px; }
+  .tour-card { max-height: calc(100dvh - 88px); overflow: auto; }
+  .modal-actions .btn { flex: 1 1 120px; }
 }
 
 @media (max-width: 720px) {

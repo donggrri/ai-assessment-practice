@@ -436,24 +436,31 @@ export function ExamApp() {
           <ResultScreen report={report} onReview={() => setView("exam")} onNewAttempt={() => setNewAttemptOpen(true)} />
         ) : (
           <>
-            <nav className="mobile-tabs" aria-label="화면 전환">
-              {(
-                [
-                  ["materials", "자료"],
-                  ["work", "풀이"],
-                  ["ai", "AI"],
-                ] as const
-              ).map(([id, label]) => (
-                <button key={id} type="button" className={mobilePane === id ? "active" : ""} onClick={() => setMobilePane(id)}>
-                  {label}
-                </button>
-              ))}
-            </nav>
             <div className="panes">
               <MaterialsPane />
               <WorkspacePane />
               <AiPane />
             </div>
+            <nav className="mobile-tabs" aria-label="화면 전환">
+              {(
+                [
+                  ["materials", "문제·자료"],
+                  ["work", "답안"],
+                  ["ai", "AI 어시스트"],
+                ] as const
+              ).map(([id, label]) => (
+                <button
+                  key={id}
+                  type="button"
+                  className={mobilePane === id ? "active" : ""}
+                  aria-current={mobilePane === id ? "page" : undefined}
+                  data-testid={`tab-${id}`}
+                  onClick={() => setMobilePane(id)}
+                >
+                  {label}
+                </button>
+              ))}
+            </nav>
           </>
         )}
       </div>

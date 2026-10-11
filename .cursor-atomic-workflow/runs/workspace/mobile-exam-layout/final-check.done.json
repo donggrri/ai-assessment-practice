@@ -1,0 +1,7 @@
+{
+  "ok": false,
+  "exitCode": 1,
+  "outputPath": "/workspace/.cursor-atomic-workflow/runs/workspace/mobile-exam-layout/final-check.done.json",
+  "command": "npx tsc --noEmit && npm run lint && npm test",
+  "errorTail": "npm warn exec The following package was not found and will be installed: tsc@2.0.4\nnpm warn deprecated tsc@2.0.4: Package no longer supported. Contact Support at https://www.npmjs.com/support for more info.\n\n\u001b[41m                                                                               \u001b[0m\n\u001b[41m\u001b[37m                This is not the tsc command you are looking for                \u001b[0m\n\u001b[41m                                                                               \u001b[0m\n\nTo get access to the TypeScript compiler, \u001b[34mtsc\u001b[0m, from the command line either:\n\n- Use \u001b[1mnpm install typescript\u001b[0m to first add TypeScript to your project \u001b[1mbefore\u001b[0m using npx\n- Use \u001b[1myarn\u001b[0m to avoid accidentally running code from un-installed packages"
+}

@@ -23,7 +23,7 @@ export function ResultScreen({
             {report.correctCount} / {report.total} 맞음
           </p>
         </div>
-        <div style={{ display: "flex", gap: 8, flexWrap: "wrap" }}>
+        <div className="result-actions">
           <button type="button" className="btn" onClick={onReview}>
             문제 화면으로
           </button>

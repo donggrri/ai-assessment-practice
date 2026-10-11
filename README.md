@@ -72,6 +72,24 @@ npm run lint
 
 들어 있는 샘플은 `건강기능식품 입점 심사`입니다. 1~4번은 주관식이고, 5번은 객관식 연습입니다. 정답과 해설은 채점 후에만 화면에 나옵니다.
 
+## 폰에서 배포
+
+이 저장소는 Origin Git에 있습니다. Vercel은 Origin 저장소를 Git 연동으로 받지 않으므로, 클론한 디렉터리에서 Vercel CLI로 올리는 방법이 가장 짧습니다. [Vercel Hobby](https://vercel.com/docs/plans/hobby)는 개인 프로젝트에 무료입니다.
+
+```bash
+npm install
+npx vercel login
+npx vercel link
+npx vercel env add OPENAI_API_KEY production
+npx vercel deploy --prod
+```
+
+`OPENAI_API_KEY` 이름은 `NEXT_PUBLIC_`으로 시작하지 않습니다. 그 값은 서버의 `lib/config.ts`와 채팅 Route Handler만 읽고, 브라우저로 내려가는 설정(`/api/config`)에는 키가 없습니다. 프리뷰에도 같은 키를 쓰려면 `npx vercel env add OPENAI_API_KEY preview`를 한 번 더 실행합니다.
+
+키를 넣지 않고 배포하면 로컬과 같이 모의 응답으로 동작합니다. `OPENAI_BASE_URL`, `OPENAI_MODEL`, `CONTEXT_CHAR_LIMIT`, `AI_REQUEST_LIMIT`, `COPY_PROTECTION`도 같은 명령으로 바꿀 수 있고, 비우면 README 표의 기본값을 씁니다.
+
+Origin에 푸시한 뒤 사이트에 반영하려면 클론을 최신으로 맞춘 다음 `npx vercel deploy --prod`를 다시 실행합니다. `.vercel/`과 `.env.local`은 커밋하지 않습니다.
+
 ## 화면
 
-왼쪽은 문제 목록, 공통 지문, 파일 목록입니다. 가운데는 문제와 답안, 파일 뷰어입니다. 오른쪽은 AI 어시스트입니다. 상단의 둘러보기가 문제 목록, 문제 설명, 파일 목록, AI 어시스트, 대화창, 문제 선택, 파일 첨부 순으로 안내합니다.
+넓은 화면은 왼쪽 문제 목록·공통 지문·파일, 가운데 문제와 답안·파일 뷰어, 오른쪽 AI 어시스트로 나뉩니다. 1024px보다 좁으면 같은 내용이 하단 탭(문제·자료, 답안, AI 어시스트)으로 바뀝니다. 상단의 둘러보기가 문제 목록, 문제 설명, 파일 목록, AI 어시스트, 대화창, 문제 선택, 파일 첨부 순으로 안내합니다.

@@ -74,13 +74,13 @@ export function AiPane() {
         </div>
         <label style={{ marginTop: 8 }}>첨부 파일</label>
         {files.length === 0 ? (
-          <p className="note">첨부된 파일 없음. 왼쪽 목록에서 마우스를 올려 추가하세요.</p>
+          <p className="note">첨부된 파일 없음. 문제·자료의 파일에서 「AI 질문에 추가」를 누르세요.</p>
         ) : (
           <div className="chips">
             {files.map((file) => (
               <span key={file.id} className="chip" data-testid={`chip-${file.id}`}>
                 {file.name}
-                <button type="button" aria-label={`${file.name} 첨부 해제`} onClick={() => exam.detachFile(file.id)} disabled={exam.locked}>
+                <button type="button" className="chip-x" aria-label={`${file.name} 첨부 해제`} onClick={() => exam.detachFile(file.id)} disabled={exam.locked}>
                   ×
                 </button>
               </span>

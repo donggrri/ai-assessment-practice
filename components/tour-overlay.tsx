@@ -14,19 +14,19 @@ export const TOUR_STEPS: { id: string; pane: MobilePane; title: string; body: st
     id: "question-body",
     pane: "work",
     title: "문제 설명",
-    body: "가운데에서 문제를 읽고 답을 입력한 뒤 답안 저장을 누릅니다. 객관식은 하나를 고르고, 주관식은 형식에 맞춰 적습니다.",
+    body: "답안 화면에서 문제를 읽고 답을 입력한 뒤 답안 저장을 누릅니다. 객관식은 하나를 고르고, 주관식은 형식에 맞춰 적습니다.",
   },
   {
     id: "file-list",
     pane: "materials",
     title: "파일 목록",
-    body: "파일명과 분량(글자 수, 대략적인 토큰)이 보입니다. 이름을 누르면 가운데 뷰어에서 내용을 읽습니다.",
+    body: "파일명과 분량(글자 수, 대략적인 토큰)이 보입니다. 이름을 누르면 답안 화면의 뷰어에서 내용을 읽습니다.",
   },
   {
     id: "ai-panel",
     pane: "ai",
     title: "AI 어시스트",
-    body: "오른쪽 패널입니다. 시험마다 질문 횟수가 정해져 있고, 남은 횟수는 위쪽에 표시됩니다.",
+    body: "시험마다 질문 횟수가 정해져 있고, 남은 횟수는 위쪽에 표시됩니다. 좁은 화면에서는 하단의 AI 어시스트 탭으로 엽니다.",
   },
   {
     id: "chat-input",
@@ -44,7 +44,7 @@ export const TOUR_STEPS: { id: string; pane: MobilePane; title: string; body: st
     id: "file-attach",
     pane: "materials",
     title: "파일 첨부",
-    body: "파일에 마우스를 올리면 AI 질문에 추가가 나옵니다. 첨부된 파일은 입력창 위 칩으로 보이고, X를 누르면 빠집니다. 첨부하지 않은 파일은 AI에게 전달되지 않습니다.",
+    body: "「AI 질문에 추가」를 누르면 이번 질문에 붙습니다. 첨부된 파일은 입력창 위 칩으로 보이고, X를 누르면 빠집니다. 첨부하지 않은 파일은 AI에게 전달되지 않습니다.",
   },
 ];
 
@@ -88,8 +88,9 @@ export function TourOverlay({
   if (!step || index == null) return null;
 
   const last = index === TOUR_STEPS.length - 1;
-  const cardTop = box ? Math.min(window.innerHeight - 210, box.top + box.height + 12) : 80;
-  const cardLeft = box ? Math.min(window.innerWidth - 400, Math.max(12, box.left)) : 16;
+  const tabReserve = window.innerWidth < 1024 ? 72 : 0;
+  const cardTop = box ? Math.min(window.innerHeight - 220 - tabReserve, box.top + box.height + 12) : 80;
+  const cardLeft = box ? Math.max(12, Math.min(box.left, window.innerWidth - Math.min(380, window.innerWidth - 24) - 12)) : 12;
 
   return (
     <>

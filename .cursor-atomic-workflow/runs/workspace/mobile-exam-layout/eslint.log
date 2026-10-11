@@ -1,0 +1,13 @@
+
+> ai-assessment-practice@0.1.0 lint
+> eslint
+
+
+/workspace/.cursor/skills/cursor-atomic-workflow/scripts/run-done.mjs
+  5:10  warning  'join' is defined but never used  @typescript-eslint/no-unused-vars
+
+/workspace/.cursor/skills/cursor-atomic-workflow/scripts/work-status.mjs
+  11:3  warning  'copyFileSync' is defined but never used  @typescript-eslint/no-unused-vars
+
+✖ 2 problems (0 errors, 2 warnings)
+

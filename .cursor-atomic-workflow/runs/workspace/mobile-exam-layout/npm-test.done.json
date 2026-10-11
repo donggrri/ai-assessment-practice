@@ -1,0 +1,6 @@
+{
+  "ok": true,
+  "exitCode": 0,
+  "outputPath": ".cursor-atomic-workflow/runs/workspace/mobile-exam-layout/npm-test.done.json",
+  "command": "npm test"
+}

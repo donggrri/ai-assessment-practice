@@ -48,7 +48,7 @@ export function MaterialsPane() {
       </section>
       <section className={`section files ${exam.tourRevealAttach ? "tour-reveal" : ""}`} data-tour="file-list">
         <h2 className="section-label">첨부 파일</h2>
-        <p className="hint">파일에 마우스를 올리면 AI 질문에 추가할 수 있습니다.</p>
+        <p className="hint">파일을 누르면 내용을 열고, 「AI 질문에 추가」로 이번 질문에 붙입니다.</p>
         <div className="scroll">
           {exam.problem.files.map((file, index) => {
             const attached = exam.attachedFileIds.includes(file.id);
