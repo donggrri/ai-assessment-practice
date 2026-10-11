@@ -1,3 +1,5 @@
+import type { ChatContentPart } from "./file-attachment";
+
 const SYSTEM = [
   "너는 문서와 표를 읽는 연습 시험의 조교다.",
   "사용자 메시지에 들어 있는 공통 지문, 선택한 문제, 첨부 파일, 질문만 근거로 답한다.",
@@ -10,7 +12,7 @@ export async function completeChat(input: {
   baseUrl: string;
   apiKey: string;
   model: string;
-  content: string;
+  content: string | ChatContentPart[];
   signal?: AbortSignal;
   fetchImpl?: typeof fetch;
 }): Promise<string> {

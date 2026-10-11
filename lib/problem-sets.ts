@@ -1,6 +1,6 @@
 import { readdirSync, readFileSync } from "node:fs";
 import path from "node:path";
-import type { Choice, ProblemSet, Question, QuestionType } from "./types";
+import type { Choice, ExamFile, ExamFileKind, ProblemSet, Question, QuestionType } from "./types";
 
 let cache: ProblemSet[] | null = null;
 
@@ -12,6 +12,40 @@ function needString(source: Record<string, unknown>, key: string, file: string):
   const value = source[key];
   if (typeof value !== "string" || value.trim() === "") {
     throw new Error(`${file}: ${key} 문자열이 필요합니다.`);
+  }
+  return value;
+}
+
+function parseExamFile(item: unknown, file: string, index: number): ExamFile {
+  if (!isRecord(item)) throw new Error(`${file}: files[${index}] 형식 오류`);
+  const kind = parseKind(item.kind, file, index);
+  const media = parseMedia(item.media, file, index);
+  if ((kind === "pdf" || kind === "png") && !media) {
+    throw new Error(`${file}: files[${index}] ${kind} 에는 media 경로가 필요합니다.`);
+  }
+  const parsed: ExamFile = {
+    id: needString(item, "id", file),
+    name: needString(item, "name", file),
+    content: needString(item, "content", file),
+  };
+  if (kind) parsed.kind = kind;
+  if (media) parsed.media = media;
+  return parsed;
+}
+
+function parseKind(value: unknown, file: string, index: number): ExamFileKind | undefined {
+  if (value == null) return undefined;
+  if (value === "text" || value === "pdf" || value === "png") return value;
+  throw new Error(`${file}: files[${index}].kind 는 text, pdf, png 중 하나입니다.`);
+}
+
+function parseMedia(value: unknown, file: string, index: number): string | undefined {
+  if (value == null) return undefined;
+  if (typeof value !== "string" || value.trim() === "") {
+    throw new Error(`${file}: files[${index}].media 경로가 비어 있습니다.`);
+  }
+  if (value.startsWith("/") || value.includes("..") || value.includes("://") || value.includes("\\")) {
+    throw new Error(`${file}: files[${index}].media 는 public 아래 상대 경로여야 합니다.`);
   }
   return value;
 }
@@ -41,14 +75,7 @@ export function parseProblemSet(value: unknown, file: string): ProblemSet {
     throw new Error(`${file}: questions 배열이 필요합니다.`);
   }
 
-  const files = filesRaw.map((item, index) => {
-    if (!isRecord(item)) throw new Error(`${file}: files[${index}] 형식 오류`);
-    return {
-      id: needString(item, "id", file),
-      name: needString(item, "name", file),
-      content: needString(item, "content", file),
-    };
-  });
+  const files = filesRaw.map((item, index) => parseExamFile(item, file, index));
   const fileIds = new Set<string>();
   for (const fileItem of files) {
     if (fileIds.has(fileItem.id)) throw new Error(`${file}: 파일 id 중복 ${fileItem.id}`);

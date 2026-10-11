@@ -2,7 +2,7 @@
 
 import { CopyGuard } from "./copy-guard";
 import { useExam } from "./exam-context";
-import { MarkdownBody } from "./markdown-body";
+import { FileViewer } from "./file-viewer";
 
 export function WorkspacePane() {
   const exam = useExam();
@@ -81,7 +81,7 @@ export function WorkspacePane() {
           </div>
           <CopyGuard enabled={exam.config.copyProtection} className="viewer-body">
             {file ? (
-              <MarkdownBody content={file.content} />
+              <FileViewer file={file} />
             ) : (
               <p className="empty-chat">파일 목록에서 파일을 선택하면 내용이 여기에 열립니다.</p>
             )}

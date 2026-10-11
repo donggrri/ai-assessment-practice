@@ -357,7 +357,18 @@ button:disabled, textarea:disabled, input:disabled, select:disabled {
   background: #f8fafc;
   font-size: 13px;
 }
-.viewer-body { overflow: auto; padding: 12px 14px 20px; flex: 1; }
+.viewer-body { overflow: auto; padding: 12px 14px 20px; flex: 1; -webkit-overflow-scrolling: touch; }
+.viewer-media { display: flex; flex-direction: column; gap: 12px; min-width: 0; }
+.viewer-image { display: block; width: 100%; max-width: 100%; height: auto; }
+.viewer-pdf {
+  display: block;
+  width: 100%;
+  max-width: 100%;
+  min-height: 70vh;
+  border: 0;
+  background: #fff;
+}
+.viewer-fallback summary { cursor: pointer; color: var(--muted); font-size: 13px; min-height: 44px; display: flex; align-items: center; }
 .lock-note { color: var(--muted); font-size: 12px; }
 
 .pane-ai { display: none; }
@@ -555,7 +566,8 @@ button:disabled, textarea:disabled, input:disabled, select:disabled {
   .pane-ai.active { overflow: auto; }
   .pane-ai .thread { flex: 1 0 180px; min-height: 160px; }
   .pane-ai .composer { max-height: none; overflow: visible; }
-  .viewer { flex: 1 0 auto; min-height: 240px; }
+  .viewer { flex: 1 0 auto; min-height: 70vh; }
+  .viewer-pdf, .viewer-image { max-width: 100%; }
   .viewer-body { -webkit-overflow-scrolling: touch; }
   .result { padding: 12px 12px calc(24px + env(safe-area-inset-bottom, 0px)); }
   .score-hero { padding: 16px; align-items: stretch; }

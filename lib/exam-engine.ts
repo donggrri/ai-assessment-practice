@@ -1,4 +1,5 @@
 import { decideChat } from "./chat-policy";
+import { composeModelContent } from "./file-attachment";
 import { gradeProblemSet } from "./grading";
 import { completeChat } from "./llm";
 import { isMockMode, type LlmSettings } from "./llm-settings";
@@ -67,8 +68,9 @@ export function createExamEngine(options: {
   config: ExamEngineConfig;
   readSettings: () => LlmSettings;
   fetchImpl?: typeof fetch;
+  loadMedia?: (media: string) => Promise<string | null>;
 }) {
-  const { sets, config, readSettings, fetchImpl } = options;
+  const { sets, config, readSettings, fetchImpl, loadMedia } = options;
 
   return {
     async send(input: SendInput): Promise<SendSuccess | SendFailure> {
@@ -110,7 +112,12 @@ export function createExamEngine(options: {
               baseUrl: settings.baseUrl,
               apiKey: settings.apiKey,
               model: settings.model,
-              content: decision.context,
+              content: await composeModelContent({
+                context: decision.context,
+                files: decision.files,
+                model: settings.model,
+                loadMedia,
+              }),
               fetchImpl,
             });
 

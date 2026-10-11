@@ -1,6 +1,6 @@
 import assert from "node:assert/strict";
 import { describe, it } from "node:test";
-import { resolveNextBasePath } from "./next-base-path";
+import { publicAssetPath, publicAssetPrefix, resolveNextBasePath } from "./next-base-path";
 
 describe("resolveNextBasePath", () => {
   it("미설정(undefined)이면 기본 basePath와 assetPrefix를 반환한다", () => {
@@ -29,5 +29,23 @@ describe("resolveNextBasePath", () => {
     assert.deepEqual(result, {});
     assert.equal("basePath" in result, false);
     assert.equal("assetPrefix" in result, false);
+  });
+});
+
+describe("publicAssetPath", () => {
+  it("미설정이면 기본 하위 경로를 붙인다", () => {
+    assert.equal(publicAssetPrefix(undefined), "/ai-assessment-practice");
+    assert.equal(
+      publicAssetPath("exam-media/beverage-survey/01_guide.pdf", publicAssetPrefix(undefined)),
+      "/ai-assessment-practice/exam-media/beverage-survey/01_guide.pdf",
+    );
+  });
+
+  it("빈 문자열이면 루트 상대 경로만 반환한다", () => {
+    assert.equal(publicAssetPath("exam-media/a.png", ""), "/exam-media/a.png");
+  });
+
+  it("접두사 끝 슬래시는 한 번만 둔다", () => {
+    assert.equal(publicAssetPath("/exam-media/a.png", "/docs/"), "/docs/exam-media/a.png");
   });
 });

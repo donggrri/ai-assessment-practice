@@ -5,10 +5,14 @@ export type Choice = {
   text: string;
 };
 
+export type ExamFileKind = "text" | "pdf" | "png";
+
 export type ExamFile = {
   id: string;
   name: string;
   content: string;
+  kind?: ExamFileKind;
+  media?: string;
 };
 
 export type Question = {

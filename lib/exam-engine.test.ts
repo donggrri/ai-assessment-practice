@@ -283,6 +283,56 @@ describe("createExamEngine", () => {
     ]);
   });
 
+  it("비전 모델에는 PNG 이미지를 붙이고 PDF 추출 텍스트를 유지한다", async () => {
+    const visualSet: ProblemSet = {
+      ...sampleSet,
+      id: "visual",
+      files: [
+        { id: "doc", name: "규정.pdf", kind: "pdf", media: "exam-media/rules.pdf", content: "PDF_EXTRACT" },
+        { id: "pic", name: "라벨.png", kind: "png", media: "exam-media/label.png", content: "ALT_TEXT" },
+      ],
+    };
+    let userContent: unknown;
+    const engine = createExamEngine({
+      sets: [visualSet],
+      config: defaultConfig,
+      readSettings: () => ({
+        apiKey: "sk-test",
+        baseUrl: "https://api.openai.com/v1",
+        model: "gpt-4o-mini",
+      }),
+      fetchImpl: async (_url, init) => {
+        const body = JSON.parse(String(init?.body)) as {
+          messages: { role: string; content: unknown }[];
+        };
+        userContent = body.messages.find((message) => message.role === "user")?.content;
+        return new Response(JSON.stringify({ choices: [{ message: { content: "모델답" } }] }), {
+          status: 200,
+        });
+      },
+      loadMedia: async () => "data:image/png;base64,AAAA",
+    });
+    const result = await engine.send({
+      problemSetId: "visual",
+      questionId: "q1",
+      fileIds: ["doc", "pic"],
+      message: "읽어줘",
+      requestsUsed: 0,
+    });
+    assert.equal(result.ok, true);
+    if (!result.ok) return;
+    assert.ok(result.charCount >= "ALT_TEXT".length + "PDF_EXTRACT".length);
+    assert.ok(Array.isArray(userContent));
+    const parts = userContent as { type: string; text?: string; image_url?: { url: string } }[];
+    const text = parts
+      .filter((part) => part.type === "text")
+      .map((part) => part.text)
+      .join("\n");
+    assert.match(text, /PDF_EXTRACT/);
+    assert.equal(text.includes("ALT_TEXT"), false);
+    assert.ok(parts.some((part) => part.type === "image_url" && part.image_url?.url.startsWith("data:image/png")));
+  });
+
   it("성공한 모의 send는 requestsUsed가 1이다(consume). 컨텍스트 한도 초과면 error \"context_limit\"이고 requestsUsed 없음", async () => {
     const engine = createExamEngine({
       sets: [sampleSet],

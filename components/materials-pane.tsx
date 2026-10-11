@@ -62,6 +62,7 @@ export function MaterialsPane() {
                 <button type="button" className="file-open" onClick={() => exam.openFile(file.id)}>
                   <span className="file-name">{file.name}</span>
                   <span className="file-meta">
+                    {file.kind === "pdf" ? "PDF · " : file.kind === "png" ? "PNG · " : ""}
                     {file.content.length.toLocaleString("ko-KR")}자 · 약 {estimateTokens(file.content).toLocaleString("ko-KR")}토큰
                   </span>
                 </button>

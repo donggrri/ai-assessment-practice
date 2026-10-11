@@ -1,6 +1,6 @@
 import { assembleContext, contextCharCount, formatQuestion } from "./context";
 import { consumeRequest } from "./requests";
-import type { ProblemSet } from "./types";
+import type { ExamFile, ProblemSet } from "./types";
 
 export type ChatDecision =
   | {
@@ -11,7 +11,7 @@ export type ChatDecision =
       remaining: number;
       questionNumber: number | null;
       questionPrompt: string | null;
-      files: { id: string; name: string; content: string }[];
+      files: ExamFile[];
       omittedFileNames: string[];
       passageChars: number;
       message: string;
