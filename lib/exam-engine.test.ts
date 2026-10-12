@@ -204,7 +204,9 @@ describe("createExamEngine", () => {
     assert.equal(serverError.ok, false);
     if (serverError.ok) return;
     assert.equal(serverError.error, "model_error");
-    assert.equal(serverError.message, modelFailMessage);
+    assert.match(serverError.message, /500/);
+    assert.match(serverError.message, /internal/);
+    assert.equal(serverError.message.includes("sk-test"), false);
     assert.equal("requestsUsed" in serverError, false);
 
     const emptyBodyEngine = createExamEngine({
@@ -223,7 +225,7 @@ describe("createExamEngine", () => {
     assert.equal(emptyContent.ok, false);
     if (emptyContent.ok) return;
     assert.equal(emptyContent.error, "model_error");
-    assert.equal(emptyContent.message, modelFailMessage);
+    assert.match(emptyContent.message, /비어/);
     assert.equal("requestsUsed" in emptyContent, false);
 
     const limitEngine = createExamEngine({
@@ -331,6 +333,84 @@ describe("createExamEngine", () => {
     assert.match(text, /PDF_EXTRACT/);
     assert.equal(text.includes("ALT_TEXT"), false);
     assert.ok(parts.some((part) => part.type === "image_url" && part.image_url?.url.startsWith("data:image/png")));
+  });
+
+  it("이미지를 거부하면 대체 텍스트로 한 번 더 보내고, OpenRouter 오류 문구를 그대로 보여 준다", async () => {
+    const visualSet: ProblemSet = {
+      ...sampleSet,
+      id: "visual",
+      files: [
+        { id: "doc", name: "규정.pdf", kind: "pdf", media: "exam-media/rules.pdf", content: "PDF_EXTRACT" },
+        { id: "pic", name: "라벨.png", kind: "png", media: "exam-media/label.png", content: "ALT_TEXT" },
+      ],
+    };
+    const apiKey = "sk-or-secretvalue";
+    const bodies: unknown[] = [];
+    let calls = 0;
+    const engine = createExamEngine({
+      sets: [visualSet],
+      config: defaultConfig,
+      readSettings: () => ({
+        apiKey: `  ${apiKey}  `,
+        baseUrl: " https://openrouter.ai/api/v1/chat/completions/ ",
+        model: " gpt-4o-mini ",
+      }),
+      fetchImpl: async (url, init) => {
+        calls += 1;
+        assert.equal(url, "https://openrouter.ai/api/v1/chat/completions");
+        const headers = init?.headers as Record<string, string>;
+        assert.equal(headers.Authorization, `Bearer ${apiKey}`);
+        assert.equal(headers["X-Title"], "AI 활용평가 연습");
+        const body = JSON.parse(String(init?.body)) as {
+          model: string;
+          messages: { role: string; content: unknown }[];
+        };
+        assert.equal(body.model, "gpt-4o-mini");
+        bodies.push(body.messages.find((message) => message.role === "user")?.content);
+        if (calls === 1) {
+          return new Response(
+            JSON.stringify({ error: { message: `No endpoints found that support image input ${apiKey}`, code: 404 } }),
+            { status: 404 },
+          );
+        }
+        return new Response(JSON.stringify({ choices: [{ message: { content: "텍스트답" } }] }), {
+          status: 200,
+        });
+      },
+      loadMedia: async () => "data:image/png;base64,AAAA",
+    });
+    const result = await engine.send({
+      problemSetId: "visual",
+      questionId: "q1",
+      fileIds: ["doc", "pic"],
+      message: "읽어줘",
+      requestsUsed: 0,
+    });
+    assert.equal(calls, 2);
+    assert.equal(result.ok, true);
+    if (!result.ok) return;
+    assert.equal(result.reply, "텍스트답");
+    assert.equal(JSON.stringify(bodies[0]).includes("ALT_TEXT"), false);
+    assert.match(String(bodies[1]), /ALT_TEXT/);
+    assert.equal(JSON.stringify(bodies).includes(apiKey), false);
+
+    const failEngine = createExamEngine({
+      sets: [sampleSet],
+      config: defaultConfig,
+      readSettings: () => ({
+        apiKey,
+        baseUrl: "https://openrouter.ai/api/v1",
+        model: "thinkingmachines/inkling:free",
+      }),
+      fetchImpl: async () =>
+        new Response(JSON.stringify({ error: { message: `키 오류 ${apiKey}` } }), { status: 401 }),
+    });
+    const failed = await failEngine.send(baseSendInput(0));
+    assert.equal(failed.ok, false);
+    if (failed.ok) return;
+    assert.match(failed.message, /401/);
+    assert.match(failed.message, /키 오류/);
+    assert.equal(failed.message.includes(apiKey), false);
   });
 
   it("성공한 모의 send는 requestsUsed가 1이다(consume). 컨텍스트 한도 초과면 error \"context_limit\"이고 requestsUsed 없음", async () => {

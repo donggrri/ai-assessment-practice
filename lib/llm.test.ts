@@ -24,6 +24,8 @@ describe("completeChat", () => {
       const headers = init?.headers as Record<string, string>;
       assert.equal(headers.Authorization, `Bearer ${apiKey}`);
       assert.equal(headers["Content-Type"], "application/json");
+      assert.equal(headers["HTTP-Referer"], undefined);
+      assert.equal(headers["X-Title"], undefined);
 
       const body = JSON.parse(String(init?.body)) as {
         model: string;
@@ -169,6 +171,57 @@ describe("completeChat", () => {
       capturedSignal,
       signal,
       "fetch에 전달된 signal은 호출자가 넘긴 signal과 같아야 한다",
+    );
+  });
+
+  it("OpenRouter 주소는 헤더를 붙이고 끝의 /chat/completions와 공백을 정리한다", async () => {
+    const apiKey = "  sk-or-testkey  ";
+    let seenUrl = "";
+    let seenHeaders: Record<string, string> = {};
+    globalThis.fetch = async (url, init) => {
+      seenUrl = String(url);
+      seenHeaders = init?.headers as Record<string, string>;
+      return new Response(JSON.stringify({ choices: [{ message: { content: "답" } }] }), { status: 200 });
+    };
+
+    const result = await completeChat({
+      baseUrl: " https://openrouter.ai/api/v1/chat/completions/ ",
+      apiKey,
+      model: " thinkingmachines/inkling:free ",
+      content: "질문",
+    });
+    assert.equal(result, "답");
+    assert.equal(seenUrl, "https://openrouter.ai/api/v1/chat/completions");
+    assert.equal(seenHeaders.Authorization, "Bearer sk-or-testkey");
+    assert.equal(seenHeaders["HTTP-Referer"].length > 0, true);
+    assert.equal(seenHeaders["X-Title"], "AI 활용평가 연습");
+  });
+
+  it("OpenRouter error.message와 상태 코드를 보여주고 키는 빼 둔다", async () => {
+    const apiKey = "sk-or-secretvalue";
+    globalThis.fetch = async () =>
+      new Response(
+        JSON.stringify({
+          error: { message: `거부됨 ${apiKey}`, code: 401 },
+        }),
+        { status: 401, headers: { "Content-Type": "application/json" } },
+      );
+
+    await assert.rejects(
+      () =>
+        completeChat({
+          baseUrl: "https://openrouter.ai/api/v1",
+          apiKey,
+          model: "thinkingmachines/inkling:free",
+          content: "질문",
+        }),
+      (err: unknown) => {
+        assert.ok(err instanceof Error);
+        assert.match(err.message, /401/);
+        assert.match(err.message, /거부됨/);
+        assert.equal(err.message.includes(apiKey), false);
+        return true;
+      },
     );
   });
 });

@@ -95,11 +95,24 @@ export function clearLlmSettings(storage?: LlmSettingsStorage): LlmSettingsResul
 }
 
 export function normalizeBaseUrl(baseUrl: string): string {
-  const trimmed = baseUrl.trim();
+  let trimmed = baseUrl.trim();
   if (trimmed === "") {
     return DEFAULT_BASE_URL;
   }
-  return trimmed.replace(/\/+$/, "");
+  trimmed = trimmed.replace(/\/+$/, "");
+  while (/\/chat\/completions$/i.test(trimmed)) {
+    trimmed = trimmed.replace(/\/chat\/completions$/i, "").replace(/\/+$/, "");
+  }
+  return trimmed === "" ? DEFAULT_BASE_URL : trimmed;
+}
+
+export function normalizeLlmSettings(settings: LlmSettings): LlmSettings {
+  const model = settings.model.trim();
+  return {
+    apiKey: settings.apiKey.trim(),
+    baseUrl: normalizeBaseUrl(settings.baseUrl),
+    model: model === "" ? DEFAULT_MODEL : model,
+  };
 }
 
 export function isMockMode(settings: LlmSettings): boolean {

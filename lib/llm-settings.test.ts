@@ -5,6 +5,7 @@ import {
   isMockMode,
   loadLlmSettings,
   normalizeBaseUrl,
+  normalizeLlmSettings,
   saveLlmSettings,
 } from "./llm-settings";
 
@@ -138,6 +139,30 @@ describe("normalizeBaseUrl", () => {
 
   it("빈 문자열이면 기본 OpenAI v1 URL을 반환한다", () => {
     assert.equal(normalizeBaseUrl(""), DEFAULT_BASE_URL);
+  });
+
+  it("앞뒤 공백과 중복된 /chat/completions를 제거한다", () => {
+    assert.equal(
+      normalizeBaseUrl("  https://openrouter.ai/api/v1/chat/completions/chat/completions/  "),
+      "https://openrouter.ai/api/v1",
+    );
+  });
+});
+
+describe("normalizeLlmSettings", () => {
+  it("키와 주소의 앞뒤 공백을 제거하고 빈 모델은 기본값으로 둔다", () => {
+    assert.deepEqual(
+      normalizeLlmSettings({
+        apiKey: "  sk-test  ",
+        baseUrl: " https://openrouter.ai/api/v1/ ",
+        model: "  ",
+      }),
+      {
+        apiKey: "sk-test",
+        baseUrl: "https://openrouter.ai/api/v1",
+        model: DEFAULT_MODEL,
+      },
+    );
   });
 });
 

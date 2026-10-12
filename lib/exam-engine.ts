@@ -1,8 +1,8 @@
 import { decideChat } from "./chat-policy";
-import { composeModelContent } from "./file-attachment";
+import { composeModelContent, type ChatContentPart } from "./file-attachment";
 import { gradeProblemSet } from "./grading";
-import { completeChat } from "./llm";
-import { isMockMode, type LlmSettings } from "./llm-settings";
+import { completeChat, isImageUnsupportedError, ModelRequestError } from "./llm";
+import { isMockMode, normalizeLlmSettings, type LlmSettings } from "./llm-settings";
 import { buildMockReply } from "./mock-ai";
 import { toPublicProblemSet, toSummary } from "./public-problem";
 import type { GradeReport, ProblemSet, PublicProblemSet, ProblemSetSummary } from "./types";
@@ -44,6 +44,17 @@ type GradeNotFound = {
 };
 
 const MODEL_FAIL_MESSAGE = "모델 호출에 실패했습니다. 잠시 후 다시 시도하세요.";
+const EMPTY_MODEL_MESSAGE = "모델 응답이 비어 있습니다.";
+
+function userFacingModelError(error: unknown): string {
+  if (error instanceof ModelRequestError) return error.message;
+  if (error instanceof Error && error.message === EMPTY_MODEL_MESSAGE) return error.message;
+  return MODEL_FAIL_MESSAGE;
+}
+
+function contentHasImage(content: string | ChatContentPart[]): boolean {
+  return Array.isArray(content) && content.some((part) => part.type === "image_url");
+}
 
 const DEFAULT_SETTINGS_ON_READ_ERROR: LlmSettings = {
   apiKey: "",
@@ -74,7 +85,7 @@ export function createExamEngine(options: {
 
   return {
     async send(input: SendInput): Promise<SendSuccess | SendFailure> {
-      const settings = readSettingsSafe(readSettings);
+      const settings = normalizeLlmSettings(readSettingsSafe(readSettings));
       const problemSet = findSet(sets, input.problemSetId);
 
       const decision = decideChat({
@@ -108,18 +119,34 @@ export function createExamEngine(options: {
               message: decision.message,
               totalChars: decision.charCount,
             })
-          : await completeChat({
-              baseUrl: settings.baseUrl,
-              apiKey: settings.apiKey,
-              model: settings.model,
-              content: await composeModelContent({
+          : await (async () => {
+              const composed = await composeModelContent({
                 context: decision.context,
                 files: decision.files,
                 model: settings.model,
                 loadMedia,
-              }),
-              fetchImpl,
-            });
+              });
+              try {
+                return await completeChat({
+                  baseUrl: settings.baseUrl,
+                  apiKey: settings.apiKey,
+                  model: settings.model,
+                  content: composed,
+                  fetchImpl,
+                });
+              } catch (error) {
+                if (contentHasImage(composed) && isImageUnsupportedError(error)) {
+                  return completeChat({
+                    baseUrl: settings.baseUrl,
+                    apiKey: settings.apiKey,
+                    model: settings.model,
+                    content: decision.context,
+                    fetchImpl,
+                  });
+                }
+                throw error;
+              }
+            })();
 
         return {
           ok: true,
@@ -131,11 +158,11 @@ export function createExamEngine(options: {
           questionNumber: decision.questionNumber,
           fileNames: decision.files.map((file) => file.name),
         };
-      } catch {
+      } catch (error) {
         return {
           ok: false,
           error: "model_error",
-          message: MODEL_FAIL_MESSAGE,
+          message: userFacingModelError(error),
         };
       }
     },

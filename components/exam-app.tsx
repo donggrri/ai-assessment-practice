@@ -7,7 +7,7 @@ import {
   clearLlmSettings,
   isMockMode,
   loadLlmSettings,
-  normalizeBaseUrl,
+  normalizeLlmSettings,
   saveLlmSettings,
 } from "@/lib/llm-settings";
 import { remainingRequests } from "@/lib/requests";
@@ -257,11 +257,7 @@ export function ExamApp({ sets: serverSets, buildConfig }: ExamAppProps) {
   }
 
   function persistSettings() {
-    const next = {
-      apiKey: settingsDraft.apiKey,
-      baseUrl: normalizeBaseUrl(settingsDraft.baseUrl),
-      model: settingsDraft.model.trim() || DEFAULT_MODEL,
-    };
+    const next = normalizeLlmSettings(settingsDraft);
     const saved: { ok: true } | { ok: false } = saveLlmSettings(next);
     if (saved.ok === false) {
       setSettingsStorageError(SETTINGS_STORAGE_ERROR);
