@@ -23,6 +23,7 @@ import type {
 } from "@/lib/types";
 import { AiPane } from "./ai-pane";
 import { ExamProvider, type MobilePane } from "./exam-context";
+import { ExamPanes } from "./exam-panes";
 import { MaterialsPane } from "./materials-pane";
 import { ResultScreen } from "./result-screen";
 import { loadExam, saveExam } from "./storage";
@@ -538,11 +539,11 @@ export function ExamApp({ sets: serverSets, buildConfig }: ExamAppProps) {
           <ResultScreen report={report} onReview={() => setView("exam")} onNewAttempt={() => setNewAttemptOpen(true)} />
         ) : (
           <>
-            <div className="panes">
+            <ExamPanes>
               <MaterialsPane />
               <WorkspacePane />
               <AiPane />
-            </div>
+            </ExamPanes>
             <nav className="mobile-tabs" aria-label="화면 전환">
               {(
                 [

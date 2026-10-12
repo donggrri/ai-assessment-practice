@@ -1,6 +1,8 @@
 "use client";
 
+import { CopyGuard } from "./copy-guard";
 import { useExam } from "./exam-context";
+import { MarkdownBody } from "./markdown-body";
 
 export function AiPane() {
   const exam = useExam();
@@ -36,7 +38,13 @@ export function AiPane() {
         ) : (
           exam.messages.map((message) => (
             <div key={message.id} className={`bubble ${message.role}`}>
-              {message.content}
+              {message.role === "assistant" ? (
+                <CopyGuard enabled={exam.config.copyProtection} className="chat-copy">
+                  <MarkdownBody content={message.content} variant="chat" />
+                </CopyGuard>
+              ) : (
+                message.content
+              )}
               {message.meta ? (
                 <div className="meta">
                   {message.meta.questionNumber ? `문제 ${message.meta.questionNumber}` : "문제 미선택"}
