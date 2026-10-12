@@ -194,7 +194,7 @@ describe("completeChat", () => {
     assert.equal(seenUrl, "https://openrouter.ai/api/v1/chat/completions");
     assert.equal(seenHeaders.Authorization, "Bearer sk-or-testkey");
     assert.equal(seenHeaders["HTTP-Referer"].length > 0, true);
-    assert.equal(seenHeaders["X-Title"], "AI 활용평가 연습");
+    assert.equal(seenHeaders["X-Title"], "AI Assessment Practice");
   });
 
   it("OpenRouter error.message와 상태 코드를 보여주고 키는 빼 둔다", async () => {

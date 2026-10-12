@@ -360,7 +360,7 @@ describe("createExamEngine", () => {
         assert.equal(url, "https://openrouter.ai/api/v1/chat/completions");
         const headers = init?.headers as Record<string, string>;
         assert.equal(headers.Authorization, `Bearer ${apiKey}`);
-        assert.equal(headers["X-Title"], "AI 활용평가 연습");
+        assert.equal(headers["X-Title"], "AI Assessment Practice");
         const body = JSON.parse(String(init?.body)) as {
           model: string;
           messages: { role: string; content: unknown }[];

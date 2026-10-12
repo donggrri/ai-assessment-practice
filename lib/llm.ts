@@ -49,7 +49,7 @@ function requestHeaders(baseUrl: string, apiKey: string): Record<string, string>
   };
   if (isOpenRouter(baseUrl)) {
     headers["HTTP-Referer"] = openRouterReferer();
-    headers["X-Title"] = "AI 활용평가 연습";
+    headers["X-Title"] = "AI Assessment Practice";
   }
   return headers;
 }
