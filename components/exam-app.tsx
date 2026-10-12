@@ -10,8 +10,10 @@ import {
   normalizeLlmSettings,
   saveLlmSettings,
 } from "@/lib/llm-settings";
+import { loadBestScore, recordBestScore } from "@/lib/best-score";
 import { remainingRequests } from "@/lib/requests";
 import { toPublicProblemSet, toSummary } from "@/lib/public-problem";
+import { attemptStarted, describeProgress, pickBestScore, type ProgressView } from "@/lib/set-progress";
 import type {
   BuildConfig,
   ChatMessage,
@@ -26,6 +28,7 @@ import { ExamProvider, type MobilePane } from "./exam-context";
 import { ExamPanes } from "./exam-panes";
 import { MaterialsPane } from "./materials-pane";
 import { ResultScreen } from "./result-screen";
+import { SetCatalog } from "./set-catalog";
 import { loadExam, saveExam } from "./storage";
 import { TOUR_STEPS, TourOverlay } from "./tour-overlay";
 import { WorkspacePane } from "./workspace-pane";
@@ -46,6 +49,23 @@ type SettingsDraft = {
   model: string;
 };
 
+function writeSetQuery(id: string | null) {
+  const url = new URL(window.location.href);
+  if (id) url.searchParams.set("set", id);
+  else url.searchParams.delete("set");
+  const next = `${url.pathname}${url.search}${url.hash}`;
+  const current = `${window.location.pathname}${window.location.search}${window.location.hash}`;
+  if (next === current) return;
+  window.history.pushState(null, "", next);
+}
+
+function routeFromLocation(ids: string[]): { id: string | null; missing: boolean } {
+  const wanted = new URLSearchParams(window.location.search).get("set");
+  if (!wanted) return { id: null, missing: false };
+  if (ids.includes(wanted)) return { id: wanted, missing: false };
+  return { id: null, missing: true };
+}
+
 function isInsecureRemoteHttp(baseUrl: string): boolean {
   const trimmed = baseUrl.trim();
   if (!trimmed.toLowerCase().startsWith("http://")) return false;
@@ -64,6 +84,8 @@ export function ExamApp({ sets: serverSets, buildConfig }: ExamAppProps) {
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
   const [setId, setSetId] = useState<string | null>(null);
+  const [screen, setScreen] = useState<"boot" | "catalog" | "exam">("boot");
+  const [catalogNotice, setCatalogNotice] = useState<string | null>(null);
   const [saved, setSaved] = useState<Record<string, string>>({});
   const [drafts, setDrafts] = useState<Record<string, string>>({});
   const [activeQuestionId, setActiveQuestionId] = useState("");
@@ -130,6 +152,13 @@ export function ExamApp({ sets: serverSets, buildConfig }: ExamAppProps) {
         if (!full) throw new Error("load");
         const data = toPublicProblemSet(full);
         const stored = loadExam(id);
+        if (stored?.report) {
+          recordBestScore(id, {
+            score: stored.report.score,
+            correctCount: stored.report.correctCount,
+            total: stored.report.total,
+          }, localStorage);
+        }
         const questionIds = new Set(data.questions.map((question) => question.id));
         const fileIds = new Set(data.files.map((file) => file.id));
         setProblem(data);
@@ -183,19 +212,62 @@ export function ExamApp({ sets: serverSets, buildConfig }: ExamAppProps) {
         model: settings.model,
       });
       setSummaries(bootSummaries);
-      const wanted = new URLSearchParams(window.location.search).get("set");
-      const id = bootSummaries.find((item) => item.id === wanted)?.id ?? bootSummaries[0]?.id;
-      if (!id) {
-        setError("문제 세트를 불러오지 못했습니다.");
+      const route = routeFromLocation(bootSummaries.map((item) => item.id));
+      setCatalogNotice(route.missing ? "요청한 문제 세트를 찾지 못했습니다." : null);
+      if (!route.id) {
+        setScreen("catalog");
         setLoading(false);
         return;
       }
-      await loadSet(id);
+      setScreen("exam");
+      await loadSet(route.id);
     })();
     return () => {
       cancel = true;
     };
   }, [loadSet, serverSets, buildConfig]);
+
+  useEffect(() => {
+    if (summaries.length === 0) return;
+    const onPop = () => {
+      const route = routeFromLocation(summaries.map((item) => item.id));
+      setCatalogNotice(route.missing ? "요청한 문제 세트를 찾지 못했습니다." : null);
+      if (!route.id) {
+        setScreen("catalog");
+        setLoading(false);
+        return;
+      }
+      setScreen("exam");
+      void loadSet(route.id);
+    };
+    window.addEventListener("popstate", onPop);
+    return () => window.removeEventListener("popstate", onPop);
+  }, [summaries, loadSet]);
+
+  const progressById = useMemo(() => {
+    if (screen !== "catalog") return {};
+    const next: Record<string, ProgressView> = {};
+    for (const summary of summaries) {
+      const stored = loadExam(summary.id);
+      const report = stored?.report
+        ? {
+            score: stored.report.score,
+            correctCount: stored.report.correctCount,
+            total: stored.report.total,
+          }
+        : null;
+      next[summary.id] = describeProgress(
+        pickBestScore(loadBestScore(summary.id, localStorage), report),
+        attemptStarted({
+          saved: stored?.saved,
+          drafts: stored?.drafts,
+          messageCount: stored?.messages.length ?? 0,
+          hasReport: Boolean(stored?.report),
+        }),
+      );
+    }
+    return next;
+  }, [screen, summaries]);
 
   useEffect(() => {
     if (!hydrated || !setId) return;
@@ -383,6 +455,11 @@ export function ExamApp({ sets: serverSets, buildConfig }: ExamAppProps) {
         setGradeError(data.message);
         return;
       }
+      recordBestScore(problem.id, {
+        score: data.score,
+        correctCount: data.correctCount,
+        total: data.total,
+      }, localStorage);
       setReport(data);
       setView("result");
       setGradeOpen(false);
@@ -423,7 +500,46 @@ export function ExamApp({ sets: serverSets, buildConfig }: ExamAppProps) {
     ? problem.questions.filter((question) => !(mergedAnswers()[question.id] ?? "").trim()).map((question) => question.number)
     : [];
 
-  if (loading || !hydrated || !config || !problem) {
+  function showCatalog() {
+    writeSetQuery(null);
+    setCatalogNotice(null);
+    setScreen("catalog");
+  }
+
+  function openSet(id: string) {
+    writeSetQuery(id);
+    setCatalogNotice(null);
+    setScreen("exam");
+    void loadSet(id);
+  }
+
+  if (screen === "boot" || !config) {
+    return (
+      <div className="center-screen">
+        <div className="empty-card">
+          <h1>AI 활용평가 연습</h1>
+          {error ? (
+            <>
+              <p>{error}</p>
+              <button type="button" className="btn tide" onClick={() => window.location.reload()}>
+                다시 시도
+              </button>
+            </>
+          ) : (
+            <p>문제 세트를 불러오는 중입니다.</p>
+          )}
+        </div>
+      </div>
+    );
+  }
+
+  if (screen === "catalog") {
+    return (
+      <SetCatalog summaries={summaries} progress={progressById} notice={catalogNotice} onOpen={openSet} />
+    );
+  }
+
+  if (loading || !hydrated || !problem) {
     return (
       <div className="center-screen">
         <div className="empty-card">
@@ -476,7 +592,7 @@ export function ExamApp({ sets: serverSets, buildConfig }: ExamAppProps) {
     setChatDraft,
     sendChat,
     switchSet: (id: string) => {
-      if (id !== setId) void loadSet(id);
+      if (id !== setId) openSet(id);
     },
   };
 
@@ -492,19 +608,12 @@ export function ExamApp({ sets: serverSets, buildConfig }: ExamAppProps) {
               <p className="eyebrow">비공식 연습</p>
               <h1>AI 활용평가 연습</h1>
             </div>
-            {summaries.length > 1 ? (
-              <select aria-label="문제 세트" value={problem.id} onChange={(event) => void loadSet(event.target.value)}>
-                {summaries.map((item) => (
-                  <option key={item.id} value={item.id}>
-                    {item.title}
-                  </option>
-                ))}
-              </select>
-            ) : (
-              <p className="set-name">{problem.title}</p>
-            )}
+            <p className="exam-title">{problem.title}</p>
           </div>
           <div className="header-actions">
+            <button type="button" className="btn ghost" data-testid="catalog-back" onClick={showCatalog}>
+              문제 목록
+            </button>
             {config.mockMode ? <span className="pill mock">모의 응답</span> : <span className="pill">{config.model}</span>}
             <span className={`pill ${remaining === 0 ? "warn" : ""}`} data-testid="remaining-requests">
               남은 AI 질문 {remaining}회

@@ -50,6 +50,14 @@ function parseMedia(value: unknown, file: string, index: number): string | undef
   return value;
 }
 
+function parseCategory(value: unknown, file: string): string | undefined {
+  if (value == null) return undefined;
+  if (typeof value !== "string" || value.trim() === "") {
+    throw new Error(`${file}: category 가 있으면 비어 있지 않은 문자열이어야 합니다.`);
+  }
+  return value.trim();
+}
+
 function parseChoices(value: unknown, file: string, questionId: string): Choice[] | undefined {
   if (value == null) return undefined;
   if (!Array.isArray(value) || value.length < 2) {
@@ -117,9 +125,11 @@ export function parseProblemSet(value: unknown, file: string): ProblemSet {
     questionIds.add(question.id);
   }
 
+  const category = parseCategory(value.category, file);
   return {
     id: needString(value, "id", file),
     title: needString(value, "title", file),
+    ...(category ? { category } : {}),
     passage: needString(value, "passage", file),
     files,
     questions,

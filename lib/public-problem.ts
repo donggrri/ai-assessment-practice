@@ -1,3 +1,4 @@
+import { setKindLabel } from "./set-progress";
 import type { ProblemSet, ProblemSetSummary, PublicProblemSet, PublicQuestion } from "./types";
 
 export function toPublicQuestion(question: ProblemSet["questions"][number]): PublicQuestion {
@@ -24,6 +25,10 @@ export function toSummary(set: ProblemSet): ProblemSetSummary {
   return {
     id: set.id,
     title: set.title,
+    kind: setKindLabel(
+      set.category,
+      set.questions.map((question) => question.type),
+    ),
     questionCount: set.questions.length,
     fileCount: set.files.length,
   };

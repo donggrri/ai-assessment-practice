@@ -28,6 +28,8 @@ export type Question = {
 export type ProblemSet = {
   id: string;
   title: string;
+  /** 카드에 보이는 유형. 없으면 문항 형식으로 정한다. */
+  category?: string;
   passage: string;
   files: ExamFile[];
   questions: Question[];
@@ -42,6 +44,7 @@ export type PublicProblemSet = Omit<ProblemSet, "questions"> & {
 export type ProblemSetSummary = {
   id: string;
   title: string;
+  kind: string;
   questionCount: number;
   fileCount: number;
 };

@@ -281,7 +281,7 @@ describe("createExamEngine", () => {
     }
 
     assert.deepEqual(engine.list(), [
-      { id: "sample", title: "샘플", questionCount: 2, fileCount: 2 },
+      { id: "sample", title: "샘플", kind: "주관식·객관식", questionCount: 2, fileCount: 2 },
     ]);
   });
 
