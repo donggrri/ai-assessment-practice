@@ -207,6 +207,70 @@ function regulationKey(products: Product[], limits: Limit[]) {
   return { q1, q2, q3, q4: String(clean.length) };
 }
 
+type BulkRow = Product & { inspector: string; result: "Pass" | "Fail" };
+
+function parseBulkRows(files: ProblemSet["files"]): { rows: BulkRow[]; finalRows: BulkRow[] } {
+  const order = ["audit-a", "audit-b", "audit-c"];
+  const raw: BulkRow[] = [];
+  const final = new Map<string, BulkRow>();
+  for (const id of order) {
+    const file = files.find((item) => item.id === id);
+    assert.ok(file);
+    const lines = section(file.content, "===ROWS===", "===END ROWS===")
+      .split("\n")
+      .filter((line) => line.trim() !== "");
+    assert.equal(lines[0], "code|markets|inspector|result|audience|ingredients|claim");
+    for (const line of lines.slice(1)) {
+      const [code, markets, inspector, result, audience, ingredients, claim] = line.split("|");
+      assert.match(code, /^NF-\d{3}$/);
+      assert.ok(result === "Pass" || result === "Fail");
+      assert.ok(audience === "성인" || audience === "어린이");
+      const row: BulkRow = {
+        code,
+        audience,
+        items: ingredients.split(",").map((part) => {
+          const [name, raw] = part.split(":");
+          const amount = Number(raw);
+          assert.ok(Number.isFinite(amount));
+          return { name, amount };
+        }),
+        claim,
+        markets: markets.split(",") as Market[],
+        inspector,
+        result,
+      };
+      raw.push(row);
+      final.set(code, row);
+    }
+  }
+  return { rows: raw, finalRows: [...final.values()] };
+}
+
+function bulkKey(rows: BulkRow[], limits: Limit[]) {
+  const q1 = joinCodes(
+    rows
+      .filter(
+        (row) =>
+          row.inspector === "노가을" &&
+          row.result === "Pass" &&
+          (exportFail(row, limits) || claimBad(row.claim)),
+      )
+      .map((row) => row.code),
+  );
+  const q2 = joinCodes(
+    rows.filter((row) => row.result === "Pass" && exportFail(row, limits)).map((row) => row.code),
+  );
+  const q3 = joinCodes(
+    rows
+      .filter((row) => !limitFail(row, "KR", limits) && limitFail(row, "EU", limits))
+      .map((row) => row.code),
+  );
+  const clean = rows.filter(
+    (row) => row.result === "Pass" && !exportFail(row, limits) && !claimBad(row.claim),
+  );
+  return { q1, q2, q3, q4: String(clean.length), q5: String(new Set(rows.map((row) => row.code)).size) };
+}
+
 function answersOf(set: ProblemSet): Record<string, string> {
   return Object.fromEntries(set.questions.map((question) => [question.id, question.answer]));
 }
@@ -296,6 +360,64 @@ describe("연습 문제 세트", () => {
     const pub = toPublicProblemSet(set);
     assert.equal(pub.files[0].kind, "pdf");
     assert.equal("answer" in pub.questions[0], false);
+  });
+
+  it("대용량 검수는 파일을 나눠 합산해야 하고 저장된 답과 다시 계산한 답이 같다", () => {
+    resetProblemSetCache();
+    const set = loadProblemSets().find((item) => item.id === "noeul-food-review");
+    assert.ok(set);
+    assert.equal(set.title, "노을푸드 수출 검수");
+    assert.equal(set.category, "규정 검수(대용량)");
+    assert.equal(set.questions.length, 5);
+    const rules = set.files.find((file) => file.id === "rules")!;
+    assert.match(rules.content, /제3조/);
+    assert.match(rules.content, /제11조/);
+    assert.match(rules.content, /상한과 같으면 통과/);
+    const limits = parseLimits(rules.content);
+    const { rows, finalRows } = parseBulkRows(set.files);
+    assert.ok(rows.length >= 80 && rows.length <= 120);
+    assert.ok(finalRows.length >= 80 && finalRows.length <= 120);
+    assert.ok(rows.length > finalRows.length);
+    const key = bulkKey(finalRows, limits);
+    const firstWins = new Map<string, BulkRow>();
+    for (const row of rows) {
+      if (!firstWins.has(row.code)) firstWins.set(row.code, row);
+    }
+    const early = bulkKey([...firstWins.values()], limits);
+    assert.notEqual(early.q1, key.q1);
+    assert.notEqual(early.q2, key.q2);
+    const onCap = finalRows.some(
+      (row) => row.items.some((item) => item.name === "나트륨" && item.amount === 600) && !limitFail(row, "KR", limits),
+    );
+    assert.equal(onCap, true);
+    const listedOnly = finalRows.filter((row) => exportFail(row, limits));
+    const anyMarket = finalRows.filter((row) => (["KR", "EU"] as Market[]).some((market) => limitFail(row, market, limits)));
+    assert.notEqual(anyMarket.length, listedOnly.length);
+    assert.deepEqual(answersOf(set), key);
+    const total = set.files.reduce((sum, file) => sum + file.content.length, 0);
+    assert.ok(total > 20000);
+    const audits = set.files.filter((file) => file.id.startsWith("audit-"));
+    assert.equal(audits.length, 3);
+    for (const file of set.files) {
+      if (file.id === "rules") continue;
+      assert.ok(rules.content.length + file.content.length < 20000, file.id);
+    }
+    assert.ok(rules.content.length + audits[0].content.length + audits[1].content.length > 20000);
+    const labels = set.files.filter((file) => file.kind === "png");
+    assert.ok(labels.length >= 2 && labels.length <= 3);
+    assert.match(labels.map((file) => file.content).join("\n"), /치료|예방|완치/);
+    for (const file of set.files) {
+      assert.ok(file.media);
+      readMagic(file.media, file.kind === "pdf" ? "%PDF" : "\u0089PNG");
+    }
+    for (const question of set.questions) {
+      assert.match(question.explanation, /파일별로|하나씩/);
+      assert.match(question.explanation, /합산/);
+      assert.match(question.explanation, /흔한 실수/);
+    }
+    assert.match(set.questions.map((question) => question.prompt).join("\n"), /노가을/);
+    assert.match(set.questions[3].prompt, /몇 개/);
+    assert.match(set.questions[4].prompt, /몇 개/);
   });
 
   it("pdf 와 png 가 아니면 media 경로를 거절한다", () => {
