@@ -44,15 +44,12 @@ type GradeNotFound = {
 };
 
 const MODEL_FAIL_MESSAGE = "모델 호출에 실패했습니다. 잠시 후 다시 시도하세요.";
-function networkDetail(error: unknown): string {
-  return error instanceof Error && error.message ? ` (${error.name}: ${error.message.slice(0, 200)})` : "";
-}
 const EMPTY_MODEL_MESSAGE = "모델 응답이 비어 있습니다.";
 
 function userFacingModelError(error: unknown): string {
   if (error instanceof ModelRequestError) return error.message;
   if (error instanceof Error && error.message === EMPTY_MODEL_MESSAGE) return error.message;
-  return MODEL_FAIL_MESSAGE + networkDetail(error);
+  return MODEL_FAIL_MESSAGE;
 }
 
 function contentHasImage(content: string | ChatContentPart[]): boolean {
