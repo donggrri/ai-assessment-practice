@@ -147,6 +147,8 @@ export function ExamApp({ sets: serverSets, buildConfig }: ExamAppProps) {
   const [livePaper, setLivePaper] = useState<LiveRef[]>([]);
   const [liveStartedAt, setLiveStartedAt] = useState<number | null>(null);
   const [liveLeft, setLiveLeft] = useState(0);
+  const [setStartedAt, setSetStartedAt] = useState<number | null>(null);
+  const [setLeft, setSetLeft] = useState(0);
   const [sourceTitle, setSourceTitle] = useState("");
   const [hydrated, setHydrated] = useState(false);
   const [chatDraft, setChatDraft] = useState("");
@@ -240,6 +242,15 @@ export function ExamApp({ sets: serverSets, buildConfig }: ExamAppProps) {
         setView(stored?.view === "result" ? "result" : "exam");
         setLivePaper([]);
         setLiveStartedAt(null);
+        const limitMin = data.timeLimitMin ?? 0;
+        if (limitMin > 0 && !stored?.report) {
+          const started = typeof stored?.startedAt === "number" ? stored.startedAt : Date.now();
+          setSetStartedAt(started);
+          setSetLeft(remainingLiveMs(started, Date.now(), limitMin * 60_000));
+        } else {
+          setSetStartedAt(null);
+          setSetLeft(0);
+        }
         sourceSetIdRef.current = null;
         setSourceTitle(full.title);
         setChatDraft("");
@@ -288,6 +299,8 @@ export function ExamApp({ sets: serverSets, buildConfig }: ExamAppProps) {
       setSourceTitle(source.title);
       setProblem({ ...pub, title: "실전 모드", questions });
       setSetId("live");
+      setSetStartedAt(null);
+      setSetLeft(0);
       setLivePaper(paper);
       const startedAt = stored?.startedAt ?? Date.now();
       setLiveStartedAt(startedAt);
@@ -442,6 +455,7 @@ export function ExamApp({ sets: serverSets, buildConfig }: ExamAppProps) {
       report,
       view,
       reviewIds,
+      ...(setStartedAt != null ? { startedAt: setStartedAt } : {}),
     });
   }, [
     hydrated,
@@ -459,6 +473,7 @@ export function ExamApp({ sets: serverSets, buildConfig }: ExamAppProps) {
     reviewIds,
     livePaper,
     liveStartedAt,
+    setStartedAt,
   ]);
 
   const measurement = useMemo(() => {
@@ -719,6 +734,11 @@ export function ExamApp({ sets: serverSets, buildConfig }: ExamAppProps) {
       clearAiGuard(localStorage, "live");
       setGuard(emptyAiGuard());
       setCooldownNow(Date.now());
+    } else if ((problem.timeLimitMin ?? 0) > 0) {
+      const minutes = problem.timeLimitMin ?? 0;
+      const startedAt = Date.now();
+      setSetStartedAt(startedAt);
+      setSetLeft(remainingLiveMs(startedAt, startedAt, minutes * 60_000));
     }
     setActiveQuestionId(problem.questions[0].id);
     if (setId === "live") {
@@ -751,15 +771,26 @@ export function ExamApp({ sets: serverSets, buildConfig }: ExamAppProps) {
     return () => window.clearInterval(timer);
   }, [strictConstraints, guard.cooldownUntil]);
 
+  const setLimitMs = (problem?.timeLimitMin ?? 0) * 60_000;
   useEffect(() => {
-    if (screen !== "exam" || setId !== "live" || liveStartedAt == null || report) return;
+    if (screen !== "exam" || report) return;
+    if (setId === "live") {
+      if (liveStartedAt == null) return;
+      const timer = window.setInterval(() => {
+        const left = remainingLiveMs(liveStartedAt, Date.now());
+        setLiveLeft(left);
+        if (left === 0) confirmGradeRef.current();
+      }, 250);
+      return () => window.clearInterval(timer);
+    }
+    if (setStartedAt == null || setLimitMs <= 0) return;
     const timer = window.setInterval(() => {
-      const left = remainingLiveMs(liveStartedAt, Date.now());
-      setLiveLeft(left);
+      const left = remainingLiveMs(setStartedAt, Date.now(), setLimitMs);
+      setSetLeft(left);
       if (left === 0) confirmGradeRef.current();
     }, 250);
     return () => window.clearInterval(timer);
-  }, [screen, setId, liveStartedAt, report]);
+  }, [screen, setId, liveStartedAt, setStartedAt, setLimitMs, report]);
 
   function startTour() {
     setView("exam");
@@ -910,7 +941,15 @@ export function ExamApp({ sets: serverSets, buildConfig }: ExamAppProps) {
   };
 
   const settingsInsecure = isInsecureRemoteHttp(settingsDraft.baseUrl);
-  const clockLabel = setId === "live" ? formatTimer(liveLeft) : null;
+  const clockLabel =
+    report != null
+      ? null
+      : setId === "live"
+        ? formatTimer(liveLeft)
+        : setStartedAt != null && setLimitMs > 0
+          ? formatTimer(setLeft)
+          : null;
+  const clockTestId = setId === "live" ? "live-timer" : "set-timer";
 
   return (
     <ExamProvider value={api}>
@@ -933,7 +972,7 @@ export function ExamApp({ sets: serverSets, buildConfig }: ExamAppProps) {
               남은 AI 질문 {remaining}회
             </span>
             {clockLabel ? (
-              <span className="pill live-timer" data-testid="live-timer-mobile">
+              <span className="pill live-timer" data-testid={`${clockTestId}-mobile`}>
                 {clockLabel}
               </span>
             ) : null}
@@ -977,7 +1016,7 @@ export function ExamApp({ sets: serverSets, buildConfig }: ExamAppProps) {
               </p>
               <div className="crumb-actions">
                 {clockLabel ? (
-                  <span className="live-timer" data-testid="live-timer">
+                  <span className="live-timer" data-testid={clockTestId}>
                     {clockLabel}
                   </span>
                 ) : null}

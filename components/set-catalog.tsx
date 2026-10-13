@@ -55,10 +55,21 @@ export function SetCatalog({ summaries, progress, notice, onOpen, onLive }: SetC
                   data-testid={`set-card-${item.id}`}
                   onClick={() => onOpen(item.id)}
                 >
-                  <span className="set-card-kind">{item.kind}</span>
+                  <span className="set-card-tags">
+                    <span className="set-card-kind">{item.kind}</span>
+                    {item.difficulty ? (
+                      <span
+                        className={`set-card-difficulty${item.difficulty === "어려움" ? " hard" : ""}`}
+                        data-testid={`difficulty-${item.id}`}
+                      >
+                        {item.difficulty}
+                      </span>
+                    ) : null}
+                  </span>
                   <strong className="set-card-title">{item.title}</strong>
                   <span className="set-card-meta">
                     문제 {item.questionCount}개 · 자료 {item.fileCount}개
+                    {item.timeLimitMin ? ` · ${item.timeLimitMin}분` : ""}
                   </span>
                   <span className={`set-card-score${view?.solved ? " solved" : view?.started ? " started" : ""}`}>
                     {status}

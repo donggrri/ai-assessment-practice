@@ -757,6 +757,12 @@ body.passage-split-dragging, body.passage-split-dragging * { user-select: none !
   border-color: var(--tide);
 }
 
+.set-card-tags {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 6px;
+}
+
 .set-card-kind {
   font-size: 12px;
   font-weight: 700;
@@ -764,6 +770,18 @@ body.passage-split-dragging, body.passage-split-dragging * { user-select: none !
   background: var(--tide-soft);
   border-radius: 999px;
   padding: 3px 8px;
+}
+
+.set-card-difficulty {
+  font-size: 12px;
+  font-weight: 700;
+  border-radius: 999px;
+  padding: 3px 8px;
+}
+
+.set-card-difficulty.hard {
+  color: #9f1239;
+  background: #ffe4e6;
 }
 
 .set-card-title {

@@ -15,6 +15,9 @@ export function toPublicProblemSet(set: ProblemSet): PublicProblemSet {
   return {
     id: set.id,
     title: set.title,
+    ...(set.category ? { category: set.category } : {}),
+    ...(set.difficulty ? { difficulty: set.difficulty } : {}),
+    ...(set.timeLimitMin ? { timeLimitMin: set.timeLimitMin } : {}),
     passage: set.passage,
     files: set.files.map((file) => ({ ...file })),
     questions: set.questions.map(toPublicQuestion),
@@ -31,5 +34,7 @@ export function toSummary(set: ProblemSet): ProblemSetSummary {
     ),
     questionCount: set.questions.length,
     fileCount: set.files.length,
+    ...(set.difficulty ? { difficulty: set.difficulty } : {}),
+    ...(set.timeLimitMin ? { timeLimitMin: set.timeLimitMin } : {}),
   };
 }

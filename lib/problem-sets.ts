@@ -1,6 +1,6 @@
 import { readdirSync, readFileSync } from "node:fs";
 import path from "node:path";
-import type { Choice, ExamFile, ExamFileKind, ProblemSet, Question, QuestionType } from "./types";
+import type { Choice, Difficulty, ExamFile, ExamFileKind, ProblemSet, Question, QuestionType } from "./types";
 
 let cache: ProblemSet[] | null = null;
 
@@ -46,6 +46,20 @@ function parseMedia(value: unknown, file: string, index: number): string | undef
   }
   if (value.startsWith("/") || value.includes("..") || value.includes("://") || value.includes("\\")) {
     throw new Error(`${file}: files[${index}].media 는 public 아래 상대 경로여야 합니다.`);
+  }
+  return value;
+}
+
+function parseDifficulty(value: unknown, file: string): Difficulty | undefined {
+  if (value == null) return undefined;
+  if (value === "쉬움" || value === "보통" || value === "어려움") return value;
+  throw new Error(`${file}: difficulty 는 쉬움, 보통, 어려움 중 하나입니다.`);
+}
+
+function parseTimeLimit(value: unknown, file: string): number | undefined {
+  if (value == null) return undefined;
+  if (typeof value !== "number" || !Number.isInteger(value) || value < 1 || value > 180) {
+    throw new Error(`${file}: timeLimitMin 은 1부터 180까지의 정수여야 합니다.`);
   }
   return value;
 }
@@ -126,10 +140,14 @@ export function parseProblemSet(value: unknown, file: string): ProblemSet {
   }
 
   const category = parseCategory(value.category, file);
+  const difficulty = parseDifficulty(value.difficulty, file);
+  const timeLimitMin = parseTimeLimit(value.timeLimitMin, file);
   return {
     id: needString(value, "id", file),
     title: needString(value, "title", file),
     ...(category ? { category } : {}),
+    ...(difficulty ? { difficulty } : {}),
+    ...(timeLimitMin ? { timeLimitMin } : {}),
     passage: needString(value, "passage", file),
     files,
     questions,

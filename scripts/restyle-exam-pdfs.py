@@ -12,6 +12,13 @@ ROOT = Path(__file__).resolve().parents[1]
 DATA = ROOT / "data" / "problem-sets"
 PUBLIC = ROOT / "public"
 
+SET_PROFILE = {
+    "seorim-gpu-audit": ("서림클라우드", "GPU 크레딧 감사"),
+    "dalbit-warehouse-audit": ("달빛물류", "다창고 입출고"),
+    "byeol-training-audit": ("별무리커머스", "교육 이수 감사"),
+    "pureun-inspect-audit": ("푸른길설비", "장비 점검"),
+}
+
 PROFILES = {
     ("noeul-food-review", "rules"): ("가공식품 수출 검수 규정", "노을푸드", "한국·EU 수출 검수"),
     ("noeul-food-review", "audit-a"): ("검수 기록 A", "노을푸드", "검수 기록"),
@@ -39,7 +46,11 @@ def main() -> None:
             target = PUBLIC / media
             title, issuer, scope = PROFILES.get(
                 (payload["id"], item["id"]),
-                (str(item.get("name") or target.name), "연습 자료", "규정"),
+                (
+                    Path(str(item.get("name") or target.name)).name,
+                    SET_PROFILE.get(payload["id"], ("연습 자료", "규정"))[0],
+                    SET_PROFILE.get(payload["id"], ("연습 자료", "규정"))[1],
+                ),
             )
             render_official_pdf(target, title, content, str(item.get("name") or target.name), issuer, scope)
             count += 1

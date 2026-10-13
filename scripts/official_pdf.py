@@ -364,13 +364,13 @@ class OfficialPdf(FPDF):
 
 def _group_index(headers: list[str]) -> int | None:
     keys = [header.strip().lower() for header in headers]
-    for name in ("inspector", "department", "검수자", "부서"):
+    for name in ("inspector", "department", "검수자", "부서", "창고", "사업장"):
         if name in keys:
             return keys.index(name)
     return None
 
 
-MEMO_LABELS = {"CLAUSES", "NOTES", "MARGIN", "AUDITNOTES", "APPENDIX", "PRINT", "CHARTNOTES"}
+MEMO_LABELS = {"CLAUSES", "NOTES", "MARGIN", "AUDITNOTES", "APPENDIX", "PRINT", "CHARTNOTES", "MEMO"}
 
 
 def _profile(title: str, filename: str, issuer: str, scope: str) -> tuple[str, str, list[tuple[str, str]]]:
@@ -405,6 +405,17 @@ def _section_name(label: str) -> str:
         "AUDIT": "검수 행",
         "AUDITNOTES": "검수 메모",
         "APPENDIX": "부록 해설",
+        "PLANS": "요금제",
+        "ROSTER": "명부",
+        "USAGE": "사용 행",
+        "SLIPS": "입출고 전표",
+        "COURSES": "수강 행",
+        "CHECKS": "점검 행",
+        "FIXES": "정정 기록",
+        "PLANCHANGE": "플랜 변경",
+        "CATALOG": "과정",
+        "MEMO": "점검 메모",
+        "FEATURES": "기능",
         "lead": "본문",
     }
     return names.get(label, label)

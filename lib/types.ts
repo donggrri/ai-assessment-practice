@@ -25,11 +25,17 @@ export type Question = {
   explanation: string;
 };
 
+export type Difficulty = "쉬움" | "보통" | "어려움";
+
 export type ProblemSet = {
   id: string;
   title: string;
   /** 카드에 보이는 유형. 없으면 문항 형식으로 정한다. */
   category?: string;
+  /** 카탈로그 난이도 배지. */
+  difficulty?: Difficulty;
+  /** 이 세트만 풀 때의 제한 시간(분). 실전 모드 90분과는 별개다. */
+  timeLimitMin?: number;
   passage: string;
   files: ExamFile[];
   questions: Question[];
@@ -47,6 +53,8 @@ export type ProblemSetSummary = {
   kind: string;
   questionCount: number;
   fileCount: number;
+  difficulty?: Difficulty;
+  timeLimitMin?: number;
 };
 
 export type GradeItem = {

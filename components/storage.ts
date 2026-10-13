@@ -13,6 +13,8 @@ export type ExamPersist = {
   report: GradeReport | null;
   view: "exam" | "result";
   reviewIds?: string[];
+  /** 제한 시간이 있는 세트를 연 시각. 없으면 타이머가 없는 세트다. */
+  startedAt?: number;
 };
 
 export function storageKey(setId: string): string {

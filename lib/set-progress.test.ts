@@ -71,6 +71,11 @@ describe("문제 모음집 목록", () => {
     assert.equal(byId.get("beverage-survey")?.title, "사내 음료 선호도 설문");
     assert.equal(byId.get("bright-life-review")?.title, "온빛라이프 식품·화장품 검수");
     assert.equal(byId.get("health-supplement-review")?.title, "건강기능식품 입점 심사");
+    for (const id of ["seorim-gpu-audit", "dalbit-warehouse-audit", "byeol-training-audit", "pureun-inspect-audit"]) {
+      assert.equal(byId.get(id)?.difficulty, "어려움");
+      assert.equal(byId.get(id)?.timeLimitMin, 25);
+      assert.equal(byId.get(id)?.questionCount, 4);
+    }
     for (const item of summaries) {
       assert.ok(item.questionCount > 0);
       assert.ok(item.fileCount > 0);
