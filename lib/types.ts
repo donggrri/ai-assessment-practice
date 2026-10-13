@@ -78,6 +78,8 @@ export type ChatMessage = {
   id: string;
   role: ChatRole;
   content: string;
+  /** 모델에 보낸 본문. 첨부 파일 텍스트가 들어 있으며 다음 질문의 user 메시지로 다시 실린다. */
+  modelContent?: string;
   createdAt: string;
   meta?: {
     questionNumber: number | null;

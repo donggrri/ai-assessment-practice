@@ -1,5 +1,6 @@
 import assert from "node:assert/strict";
 import { afterEach, describe, it } from "node:test";
+import { chatSystemPrompt } from "./chat-thread";
 import { completeChat } from "./llm";
 
 const originalFetch = globalThis.fetch;
@@ -13,6 +14,44 @@ afterEach(() => {
 });
 
 describe("completeChat", () => {
+  it("history를 messages 앞에 두고, 시스템 프롬프트는 지금까지의 대화를 근거로 한다", async () => {
+    let body: { messages: { role: string; content: string }[] } | undefined;
+    globalThis.fetch = async (_url, init) => {
+      body = JSON.parse(String(init?.body)) as { messages: { role: string; content: string }[] };
+      return new Response(
+        JSON.stringify({ choices: [{ message: { content: "이어서" } }] }),
+        { status: 200, headers: { "Content-Type": "application/json" } },
+      );
+    };
+
+    const result = await completeChat({
+      baseUrl: "https://api.example.com/v1",
+      apiKey: "sk-test",
+      model: "gpt-test",
+      history: [
+        { role: "user", content: "FILE_A_BODY 첫번째" },
+        { role: "assistant", content: "표 결과" },
+      ],
+      content: "FILE_C_BODY 합쳐",
+    });
+
+    assert.equal(result, "이어서");
+    assert.ok(body);
+    assert.equal(body.messages.length, 4);
+    assert.equal(body.messages[0].role, "system");
+    assert.equal(body.messages[0].content, chatSystemPrompt);
+    assert.match(
+      body.messages[0].content,
+      /이번 대화에서 지금까지 주고받은 메시지\(이전 턴의 첨부 파일과 네가 만든 표 포함\)를 근거로 답한다\. 대화 어디에도 없는 자료는 추측하지 않고 확인 불가로 적는다\./,
+    );
+    assert.equal(body.messages[0].content.includes("사용자 메시지에 들어 있는"), false);
+    assert.equal(body.messages[0].content.includes("첨부되지 않은 자료는 없다고"), false);
+    assert.equal(body.messages[0].content.includes("이전 대화 없음"), false);
+    assert.deepEqual(body.messages[1], { role: "user", content: "FILE_A_BODY 첫번째" });
+    assert.deepEqual(body.messages[2], { role: "assistant", content: "표 결과" });
+    assert.deepEqual(body.messages[3], { role: "user", content: "FILE_C_BODY 합쳐" });
+  });
+
   it('성공: fetch가 200과 choices[0].message.content "안녕하세요"를 주면 "안녕하세요"를 반환한다', async () => {
     const baseUrl = "https://api.example.com/v1";
     const apiKey = "sk-test-key";

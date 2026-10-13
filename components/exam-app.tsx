@@ -1,6 +1,7 @@
 "use client";
 
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
+import { chatSystemPrompt, historyFromChat, threadUsage } from "@/lib/chat-thread";
 import { measureContext } from "@/lib/context";
 import { createExamEngine } from "@/lib/exam-engine";
 import {
@@ -580,6 +581,12 @@ export function ExamApp({ sets: serverSets, buildConfig }: ExamAppProps) {
     saveStrictConstraints(localStorage, enabled);
   }
 
+  function clearChat() {
+    if (sending) return;
+    setMessages([]);
+    setChatError(null);
+  }
+
   async function sendChat() {
     if (!problem || !config || !engine || !setId || locked || sending) return;
     if (chatDraft.trim() === "" || measurement.over || remaining === 0) return;
@@ -601,6 +608,7 @@ export function ExamApp({ sets: serverSets, buildConfig }: ExamAppProps) {
         fileIds: attachedFileIds.filter((fileId) => allowed.has(fileId)),
         message: chatDraft,
         requestsUsed,
+        history: historyFromChat(messages),
       });
       if (!data.ok) {
         if (cooling) rememberGuard({ v: 1, lastMessage: guard.lastMessage, cooldownUntil: 0 });
@@ -612,6 +620,7 @@ export function ExamApp({ sets: serverSets, buildConfig }: ExamAppProps) {
         id: crypto.randomUUID(),
         role: "user",
         content: chatDraft,
+        modelContent: data.userContent,
         createdAt: new Date().toISOString(),
         meta: {
           questionNumber: data.questionNumber ?? null,
@@ -712,15 +721,19 @@ export function ExamApp({ sets: serverSets, buildConfig }: ExamAppProps) {
       setCooldownNow(Date.now());
     }
     setActiveQuestionId(problem.questions[0].id);
-    setMessages((prev) => [
-      ...prev,
-      {
-        id: crypto.randomUUID(),
-        role: "system",
-        content: "새 응시를 시작했습니다. 이전 대화는 삭제하지 않았고, AI 질문 횟수만 다시 채워졌습니다.",
-        createdAt: new Date().toISOString(),
-      },
-    ]);
+    if (setId === "live") {
+      setMessages([]);
+    } else {
+      setMessages((prev) => [
+        ...prev,
+        {
+          id: crypto.randomUUID(),
+          role: "system",
+          content: "새 응시를 시작했습니다. 이전 대화는 삭제하지 않았고, AI 질문 횟수만 다시 채워졌습니다.",
+          createdAt: new Date().toISOString(),
+        },
+      ]);
+    }
     setNewAttemptOpen(false);
   }
 
@@ -830,6 +843,13 @@ export function ExamApp({ sets: serverSets, buildConfig }: ExamAppProps) {
       ? "직전 질문과 거의 같습니다. 질문을 바꿔 보세요."
       : null;
 
+  const historyTurns = historyFromChat(messages);
+  const thread = threadUsage([
+    chatSystemPrompt,
+    ...historyTurns.map((turn) => turn.content),
+    measurement.text,
+  ]);
+
   const api = {
     config,
     problem,
@@ -841,6 +861,8 @@ export function ExamApp({ sets: serverSets, buildConfig }: ExamAppProps) {
     attachedFileIds,
     chatQuestionId,
     messages,
+    threadChars: thread.chars,
+    threadTokens: thread.tokens,
     requestsUsed,
     report,
     sending,
@@ -871,6 +893,7 @@ export function ExamApp({ sets: serverSets, buildConfig }: ExamAppProps) {
     setChatQuestionId: chooseChatQuestion,
     setChatDraft,
     sendChat,
+    clearChat,
     strictConstraints,
     setStrictConstraints,
     cooldownLeftMs,

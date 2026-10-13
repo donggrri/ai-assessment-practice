@@ -413,6 +413,176 @@ describe("createExamEngine", () => {
     assert.equal(failed.message.includes(apiKey), false);
   });
 
+  it("두 번째 요청 payload에 첫 user(첨부 본문)와 assistant가 들어간다. 모의와 fetch 모두", async () => {
+    const filesSet: ProblemSet = {
+      ...sampleSet,
+      id: "files",
+      passage: "지문",
+      files: [
+        { id: "a", name: "A.md", content: "FILE_A_BODY" },
+        { id: "b", name: "B.md", content: "FILE_B_BODY" },
+        { id: "c", name: "C.md", content: "FILE_C_BODY" },
+      ],
+    };
+    const turn = (fileIds: string[], message: string, requestsUsed: number, history?: { role: "user" | "assistant"; content: string }[]) => ({
+      problemSetId: "files",
+      questionId: "q1",
+      fileIds,
+      message,
+      requestsUsed,
+      history,
+    });
+
+    const mockEngine = createExamEngine({
+      sets: [filesSet],
+      config: defaultConfig,
+      readSettings: () => defaultSettings,
+    });
+    const first = await mockEngine.send(turn(["a", "b"], "첫번째", 0, []));
+    assert.equal(first.ok, true);
+    if (!first.ok) return;
+    assert.equal(first.mock, true);
+    assert.match(first.userContent, /FILE_A_BODY/);
+    assert.match(first.userContent, /FILE_B_BODY/);
+    assert.match(first.reply, /이전 대화 0턴/);
+    assert.equal(first.messages[0].role, "system");
+    assert.match(String(first.messages[0].content), /이번 대화에서 지금까지 주고받은 메시지/);
+    assert.equal(String(first.messages[0].content).includes("이전 대화 없음"), false);
+
+    const second = await mockEngine.send(
+      turn(["c"], "합쳐", 1, [
+        { role: "user", content: first.userContent },
+        { role: "assistant", content: first.reply },
+      ]),
+    );
+    assert.equal(second.ok, true);
+    if (!second.ok) return;
+    assert.equal(second.messages.length, 4);
+    assert.equal(second.messages[1].role, "user");
+    assert.match(String(second.messages[1].content), /FILE_A_BODY/);
+    assert.match(String(second.messages[1].content), /FILE_B_BODY/);
+    assert.equal(second.messages[2].role, "assistant");
+    assert.equal(second.messages[2].content, first.reply);
+    assert.match(String(second.messages[3].content), /FILE_C_BODY/);
+    assert.match(second.reply, /이전 대화 2턴/);
+    const mockBlob = second.messages.map((message) => String(message.content)).join("\n");
+    assert.match(mockBlob, /FILE_A_BODY/);
+    assert.match(mockBlob, /FILE_B_BODY/);
+    assert.match(mockBlob, /FILE_C_BODY/);
+
+    const payloads: { messages: { role: string; content: string }[] }[] = [];
+    const liveEngine = createExamEngine({
+      sets: [filesSet],
+      config: { ...defaultConfig, contextCharLimit: 400 },
+      readSettings: () => ({
+        apiKey: "sk-test",
+        baseUrl: "https://api.example.com/v1",
+        model: "gpt-4",
+      }),
+      fetchImpl: async (_url, init) => {
+        payloads.push(JSON.parse(String(init?.body)) as { messages: { role: string; content: string }[] });
+        return new Response(
+          JSON.stringify({ choices: [{ message: { content: `답${payloads.length}` } }] }),
+          { status: 200 },
+        );
+      },
+    });
+    const liveFirst = await liveEngine.send(turn(["a", "b"], "첫번째", 0));
+    assert.equal(liveFirst.ok, true);
+    if (!liveFirst.ok) return;
+    assert.match(liveFirst.userContent, /FILE_A_BODY/);
+    const liveSecond = await liveEngine.send(
+      turn(["c"], "합쳐", 1, [
+        { role: "user", content: liveFirst.userContent },
+        { role: "assistant", content: liveFirst.reply },
+      ]),
+    );
+    assert.equal(liveSecond.ok, true);
+    if (!liveSecond.ok) return;
+    assert.equal(payloads.length, 2);
+    const sent = payloads[1].messages;
+    assert.equal(sent.length, 4);
+    assert.match(sent[0].content, /이번 대화에서 지금까지 주고받은 메시지\(이전 턴의 첨부 파일과 네가 만든 표 포함\)/);
+    assert.equal(sent[0].content.includes("첨부되지 않은 자료는 없다고"), false);
+    assert.equal(sent[1].role, "user");
+    assert.match(sent[1].content, /FILE_A_BODY/);
+    assert.match(sent[1].content, /FILE_B_BODY/);
+    assert.deepEqual(sent[2], { role: "assistant", content: "답1" });
+    assert.match(sent[3].content, /FILE_C_BODY/);
+    assert.equal(liveSecond.messages[2].content, "답1");
+
+    const hugeHistory = "H".repeat(5000);
+    const overHistory = await liveEngine.send(
+      turn(["c"], "이번만", 2, [
+        { role: "user", content: hugeHistory },
+        { role: "assistant", content: "이전답" },
+      ]),
+    );
+    assert.equal(overHistory.ok, true);
+    if (!overHistory.ok) return;
+    assert.match(String(overHistory.messages[1].content), /H{5000}/);
+    assert.match(String(overHistory.messages[3].content), /FILE_C_BODY/);
+  });
+
+  it("이미지를 거부해 다시 보낼 때도 이전 대화를 유지한다", async () => {
+    const visualSet: ProblemSet = {
+      ...sampleSet,
+      id: "visual-history",
+      files: [
+        { id: "doc", name: "규정.pdf", kind: "pdf", media: "exam-media/rules.pdf", content: "PDF_EXTRACT" },
+        { id: "pic", name: "라벨.png", kind: "png", media: "exam-media/label.png", content: "ALT_TEXT" },
+      ],
+    };
+    const bodies: { role: string; content: unknown }[][] = [];
+    let calls = 0;
+    const engine = createExamEngine({
+      sets: [visualSet],
+      config: defaultConfig,
+      readSettings: () => ({
+        apiKey: "sk-test",
+        baseUrl: "https://api.openai.com/v1",
+        model: "gpt-4o-mini",
+      }),
+      fetchImpl: async (_url, init) => {
+        calls += 1;
+        const body = JSON.parse(String(init?.body)) as { messages: { role: string; content: unknown }[] };
+        bodies.push(body.messages);
+        if (calls === 1) {
+          return new Response(JSON.stringify({ error: { message: "image input unsupported", code: 400 } }), {
+            status: 400,
+          });
+        }
+        return new Response(JSON.stringify({ choices: [{ message: { content: "텍스트답" } }] }), { status: 200 });
+      },
+      loadMedia: async () => "data:image/png;base64,AAAA",
+    });
+    const result = await engine.send({
+      problemSetId: "visual-history",
+      questionId: "q1",
+      fileIds: ["doc", "pic"],
+      message: "읽어줘",
+      requestsUsed: 0,
+      history: [
+        { role: "user", content: "PREV_FILE_BODY" },
+        { role: "assistant", content: "이전표" },
+      ],
+    });
+    assert.equal(calls, 2);
+    assert.equal(result.ok, true);
+    if (!result.ok) return;
+    assert.match(result.userContent, /ALT_TEXT/);
+    assert.match(result.userContent, /PDF_EXTRACT/);
+    for (const messages of bodies) {
+      assert.deepEqual(messages[1], { role: "user", content: "PREV_FILE_BODY" });
+      assert.deepEqual(messages[2], { role: "assistant", content: "이전표" });
+    }
+    assert.equal(Array.isArray(bodies[0][3].content), true);
+    assert.match(String(bodies[1][3].content), /ALT_TEXT/);
+    assert.match(String(bodies[1][3].content), /PDF_EXTRACT/);
+    assert.equal(result.messages[1].content, "PREV_FILE_BODY");
+    assert.match(String(result.messages[3].content), /ALT_TEXT/);
+  });
+
   it("성공한 모의 send는 requestsUsed가 1이다(consume). 컨텍스트 한도 초과면 error \"context_limit\"이고 requestsUsed 없음", async () => {
     const engine = createExamEngine({
       sets: [sampleSet],

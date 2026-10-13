@@ -1,4 +1,5 @@
 import { decideChat } from "./chat-policy";
+import { buildModelMessages, type ModelTurn } from "./chat-thread";
 import { composeModelContent, type ChatContentPart } from "./file-attachment";
 import { gradeProblemSet } from "./grading";
 import { completeChat, isImageUnsupportedError, ModelRequestError } from "./llm";
@@ -19,6 +20,7 @@ type SendInput = {
   fileIds: string[];
   message: string;
   requestsUsed: number;
+  history?: readonly ModelTurn[];
 };
 
 type SendSuccess = {
@@ -30,6 +32,8 @@ type SendSuccess = {
   remaining: number;
   questionNumber: number | null;
   fileNames: string[];
+  userContent: string;
+  messages: ReturnType<typeof buildModelMessages>;
 };
 
 type SendFailure = {
@@ -107,8 +111,10 @@ export function createExamEngine(options: {
       }
 
       const mock = isMockMode(settings);
+      const history = input.history ?? [];
 
       try {
+        let sentMessages = buildModelMessages(history, decision.context);
         const reply = mock
           ? buildMockReply({
               passageChars: decision.passageChars,
@@ -118,6 +124,7 @@ export function createExamEngine(options: {
               omittedFileNames: decision.omittedFileNames,
               message: decision.message,
               totalChars: decision.charCount,
+              priorTurns: history.length,
             })
           : await (async () => {
               const composed = await composeModelContent({
@@ -126,21 +133,25 @@ export function createExamEngine(options: {
                 model: settings.model,
                 loadMedia,
               });
+              sentMessages = buildModelMessages(history, composed);
               try {
                 return await completeChat({
                   baseUrl: settings.baseUrl,
                   apiKey: settings.apiKey,
                   model: settings.model,
                   content: composed,
+                  history,
                   fetchImpl,
                 });
               } catch (error) {
                 if (contentHasImage(composed) && isImageUnsupportedError(error)) {
+                  sentMessages = buildModelMessages(history, decision.context);
                   return completeChat({
                     baseUrl: settings.baseUrl,
                     apiKey: settings.apiKey,
                     model: settings.model,
                     content: decision.context,
+                    history,
                     fetchImpl,
                   });
                 }
@@ -157,6 +168,8 @@ export function createExamEngine(options: {
           remaining: decision.remaining,
           questionNumber: decision.questionNumber,
           fileNames: decision.files.map((file) => file.name),
+          userContent: decision.context,
+          messages: sentMessages,
         };
       } catch (error) {
         return {

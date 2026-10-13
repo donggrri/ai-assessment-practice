@@ -1,13 +1,8 @@
+import { buildModelMessages, type ModelTurn } from "./chat-thread";
 import type { ChatContentPart } from "./file-attachment";
 import { normalizeBaseUrl } from "./llm-settings";
 
-const SYSTEM = [
-  "너는 문서와 표를 읽는 연습 시험의 조교다.",
-  "사용자 메시지에 들어 있는 공통 지문, 선택한 문제, 첨부 파일, 질문만 근거로 답한다.",
-  "첨부되지 않은 자료는 없다고 보고, 추측하지 않는다. 근거가 없으면 확인 불가로 적는다.",
-  "계산이나 대조가 필요하면 조건별로 표를 만들고 과정을 단계로 보여 준다.",
-  "답은 한국어로 쓴다.",
-].join("\n");
+export type { ModelTurn };
 
 export class ModelRequestError extends Error {
   readonly status: number;
@@ -87,6 +82,7 @@ export async function completeChat(input: {
   apiKey: string;
   model: string;
   content: string | ChatContentPart[];
+  history?: readonly ModelTurn[];
   signal?: AbortSignal;
   fetchImpl?: typeof fetch;
 }): Promise<string> {
@@ -100,10 +96,7 @@ export async function completeChat(input: {
     body: JSON.stringify({
       model: input.model.trim(),
       temperature: 0.2,
-      messages: [
-        { role: "system", content: SYSTEM },
-        { role: "user", content: input.content },
-      ],
+      messages: buildModelMessages(input.history ?? [], input.content),
     }),
     signal,
   });

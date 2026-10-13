@@ -29,24 +29,35 @@ export function AiPane() {
       <div className="ai-head">
         <div className="ai-head-row">
           <h2>AI 어시스트</h2>
-          {exam.remaining === 0 ? (
-            <span className="exhausted" data-testid="requests-exhausted">
-              횟수 소진
-            </span>
-          ) : null}
+          <div className="ai-head-actions">
+            {exam.remaining === 0 ? (
+              <span className="exhausted" data-testid="requests-exhausted">
+                횟수 소진
+              </span>
+            ) : null}
+            <button
+              type="button"
+              className="btn small"
+              data-testid="clear-chat"
+              disabled={exam.sending || exam.messages.length === 0}
+              onClick={() => exam.clearChat()}
+            >
+              대화 초기화
+            </button>
+          </div>
         </div>
         <p>
           {exam.config.mockMode
             ? "모의 응답 모드입니다. 헤더의 AI 설정에서 API 키를 저장하면 선택한 모델에 질문합니다. "
             : `${exam.config.model}에 질문합니다. `}
-          첨부한 파일과 고른 문제, 공통 지문, 이번 질문만 전달됩니다.
+          이전 대화와 그 턴에 첨부한 파일, 이번 질문의 공통 지문·문제·첨부 파일을 함께 전달합니다.
         </p>
       </div>
       <div className="thread" data-testid="chat-thread" aria-live="polite">
         {exam.messages.length === 0 ? (
           <p className="empty-chat">
             아직 대화가 없습니다. 문제를 고르고 필요한 파일만 첨부한 뒤 질문하세요. 문제를 고르지 않으면 공통 지문만 전달됩니다.
-            이전 대화는 다음 질문에 다시 실리지 않으며, 기록은 지울 수 없습니다.
+            같은 세트의 이전 질문과 첨부 내용은 다음 질문에도 함께 전달되며, 대화 초기화로 지울 수 있습니다.
           </p>
         ) : (
           exam.messages.map((message) => (
@@ -167,6 +178,9 @@ export function AiPane() {
           aria-live="polite"
         >
           컨텍스트 {exam.measurement.charCount.toLocaleString("ko-KR")} / {limit.toLocaleString("ko-KR")}자
+        </p>
+        <p className="counter" data-testid="thread-usage">
+          대화 누적 {exam.threadChars.toLocaleString("ko-KR")}자 · 약 {exam.threadTokens.toLocaleString("ko-KR")}토큰
         </p>
         {exam.measurement.over ? (
           <p className="warn" role="alert" data-testid="context-warning">

@@ -23,6 +23,8 @@ export type ExamApi = {
   attachedFileIds: string[];
   chatQuestionId: string | null;
   messages: ChatMessage[];
+  threadChars: number;
+  threadTokens: number;
   requestsUsed: number;
   report: GradeReport | null;
   sending: boolean;
@@ -50,6 +52,7 @@ export type ExamApi = {
   setChatQuestionId: (id: string | null) => void;
   setChatDraft: (value: string) => void;
   sendChat: () => void;
+  clearChat: () => void;
   strictConstraints: boolean;
   setStrictConstraints: (enabled: boolean) => void;
   cooldownLeftMs: number;

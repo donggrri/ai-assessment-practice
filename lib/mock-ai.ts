@@ -8,6 +8,7 @@ export function buildMockReply(input: {
   omittedFileNames: string[];
   message: string;
   totalChars: number;
+  priorTurns?: number;
 }): string {
   const fileTokens = input.files.reduce((sum, file) => sum + estimateTokens(file.content), 0);
   const lines = [
@@ -28,6 +29,7 @@ export function buildMockReply(input: {
     input.omittedFileNames.length
       ? `- 첨부하지 않아 빠뜨린 파일: ${input.omittedFileNames.join(", ")}`
       : "- 빠뜨린 파일 없음",
+    `- 이전 대화 ${input.priorTurns ?? 0}턴을 이 요청의 messages에 포함했습니다.`,
     `- 질문 ${input.message.length.toLocaleString("ko-KR")}자`,
     `- 합계 ${input.totalChars.toLocaleString("ko-KR")}자`,
     "",

@@ -813,6 +813,13 @@ body.passage-split-dragging, body.passage-split-dragging * { user-select: none !
   gap: 8px;
 }
 
+.ai-head-actions {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  flex: none;
+}
+
 .exhausted {
   flex: none;
   border-radius: 999px;
