@@ -80,7 +80,7 @@ export function ExamPanes({ children }: { children: ReactNode }) {
     <div
       ref={panesRef}
       className={`panes${dragging ? " dragging" : ""}`}
-      style={desktop ? { gridTemplateColumns: `300px minmax(0, 1fr) ${width}px` } : undefined}
+      style={desktop ? { gridTemplateColumns: `76px minmax(0, 1fr) ${width}px` } : undefined}
     >
       {children}
       <div

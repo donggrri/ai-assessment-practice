@@ -65,7 +65,10 @@ export function TourOverlay({
   useEffect(() => {
     if (!step) return;
     const update = () => {
-      const element = document.querySelector(`[data-tour="${step.id}"]`);
+      const element = [...document.querySelectorAll(`[data-tour="${step.id}"]`)].find((node) => {
+        if (!(node instanceof HTMLElement)) return false;
+        return node.getClientRects().length > 0 && getComputedStyle(node).visibility !== "hidden";
+      });
       if (!(element instanceof HTMLElement)) {
         setBox(null);
         return;

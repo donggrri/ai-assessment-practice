@@ -11,6 +11,18 @@ import {
   saveLlmSettings,
 } from "@/lib/llm-settings";
 import { loadBestScore, recordBestScore } from "@/lib/best-score";
+import {
+  buildLivePaper,
+  formatTimer,
+  gradeLivePaper,
+  liveQuestions,
+  loadLiveSession,
+  parseLiveQuestionKey,
+  remainingLiveMs,
+  saveLiveSession,
+  type LiveRef,
+  type LiveSession,
+} from "@/lib/live-exam";
 import { remainingRequests } from "@/lib/requests";
 import { toPublicProblemSet, toSummary } from "@/lib/public-problem";
 import { attemptStarted, describeProgress, pickBestScore, type ProgressView } from "@/lib/set-progress";
@@ -24,6 +36,7 @@ import type {
   PublicProblemSet,
 } from "@/lib/types";
 import { AiPane } from "./ai-pane";
+import { DesktopCenter, ExamFooter, QuestionRail } from "./desktop-exam";
 import { ExamProvider, type MobilePane } from "./exam-context";
 import { ExamPanes } from "./exam-panes";
 import { MaterialsPane } from "./materials-pane";
@@ -49,21 +62,42 @@ type SettingsDraft = {
   model: string;
 };
 
-function writeSetQuery(id: string | null) {
+function writeLocation(mutate: (params: URLSearchParams) => void) {
   const url = new URL(window.location.href);
-  if (id) url.searchParams.set("set", id);
-  else url.searchParams.delete("set");
+  mutate(url.searchParams);
   const next = `${url.pathname}${url.search}${url.hash}`;
   const current = `${window.location.pathname}${window.location.search}${window.location.hash}`;
   if (next === current) return;
   window.history.pushState(null, "", next);
 }
 
-function routeFromLocation(ids: string[]): { id: string | null; missing: boolean } {
-  const wanted = new URLSearchParams(window.location.search).get("set");
-  if (!wanted) return { id: null, missing: false };
-  if (ids.includes(wanted)) return { id: wanted, missing: false };
-  return { id: null, missing: true };
+function writeSetQuery(id: string | null) {
+  writeLocation((params) => {
+    params.delete("live");
+    if (id) params.set("set", id);
+    else params.delete("set");
+  });
+}
+
+function writeLiveQuery() {
+  writeLocation((params) => {
+    params.delete("set");
+    params.set("live", "1");
+  });
+}
+
+type AppRoute =
+  | { kind: "catalog"; missing: boolean }
+  | { kind: "set"; id: string }
+  | { kind: "live" };
+
+function routeFromLocation(ids: string[]): AppRoute {
+  const params = new URLSearchParams(window.location.search);
+  if (params.get("live") === "1") return { kind: "live" };
+  const wanted = params.get("set");
+  if (!wanted) return { kind: "catalog", missing: false };
+  if (ids.includes(wanted)) return { kind: "set", id: wanted };
+  return { kind: "catalog", missing: true };
 }
 
 function isInsecureRemoteHttp(baseUrl: string): boolean {
@@ -95,7 +129,12 @@ export function ExamApp({ sets: serverSets, buildConfig }: ExamAppProps) {
   const [messages, setMessages] = useState<ChatMessage[]>([]);
   const [requestsUsed, setRequestsUsed] = useState(0);
   const [report, setReport] = useState<GradeReport | null>(null);
+  const [reviewIds, setReviewIds] = useState<string[]>([]);
   const [view, setView] = useState<"exam" | "result">("exam");
+  const [livePaper, setLivePaper] = useState<LiveRef[]>([]);
+  const [liveStartedAt, setLiveStartedAt] = useState<number | null>(null);
+  const [liveLeft, setLiveLeft] = useState(0);
+  const [sourceTitle, setSourceTitle] = useState("");
   const [hydrated, setHydrated] = useState(false);
   const [chatDraft, setChatDraft] = useState("");
   const [sending, setSending] = useState(false);
@@ -115,6 +154,9 @@ export function ExamApp({ sets: serverSets, buildConfig }: ExamAppProps) {
     model: DEFAULT_MODEL,
   });
   const flashTimer = useRef<number | null>(null);
+  const sourceSetIdRef = useRef<string | null>(null);
+  const gradingRef = useRef(false);
+  const confirmGradeRef = useRef<(auto?: boolean) => void>(() => {});
 
   const engine = useMemo(() => {
     if (!serverSets || !buildConfig) return null;
@@ -178,7 +220,12 @@ export function ExamApp({ sets: serverSets, buildConfig }: ExamAppProps) {
         setMessages(Array.isArray(stored?.messages) ? stored.messages : []);
         setRequestsUsed(typeof stored?.requestsUsed === "number" ? stored.requestsUsed : 0);
         setReport(stored?.report ?? null);
+        setReviewIds(Array.isArray(stored?.reviewIds) ? stored.reviewIds : []);
         setView(stored?.view === "result" ? "result" : "exam");
+        setLivePaper([]);
+        setLiveStartedAt(null);
+        sourceSetIdRef.current = null;
+        setSourceTitle(full.title);
         setChatDraft("");
         setChatError(null);
         setHydrated(true);
@@ -187,6 +234,62 @@ export function ExamApp({ sets: serverSets, buildConfig }: ExamAppProps) {
         setError("문제 세트를 불러오지 못했습니다.");
         setLoading(false);
       }
+    },
+    [serverSets],
+  );
+
+  const enterLive = useCallback(
+    (resume: boolean) => {
+      if (!serverSets) return;
+      writeLiveQuery();
+      setScreen("exam");
+      setCatalogNotice(null);
+      setLoading(true);
+      setError(null);
+      setHydrated(false);
+      const stored: LiveSession | null = resume ? loadLiveSession(localStorage) : null;
+      const paper = stored?.paper.length ? stored.paper : buildLivePaper(serverSets);
+      const questions = liveQuestions(serverSets, paper);
+      if (questions.length === 0) {
+        setCatalogNotice("실전 모드로 모을 문제가 없습니다.");
+        setScreen("catalog");
+        setLoading(false);
+        return;
+      }
+      const active =
+        stored?.activeQuestionId && questions.some((question) => question.id === stored.activeQuestionId)
+          ? stored.activeQuestionId
+          : questions[0].id;
+      const ref = parseLiveQuestionKey(active);
+      const source = serverSets.find((set) => set.id === ref?.setId) ?? serverSets[0];
+      const pub = toPublicProblemSet(source);
+      const fileIds = new Set(pub.files.map((file) => file.id));
+      const questionIds = new Set(questions.map((question) => question.id));
+      sourceSetIdRef.current = source.id;
+      setSourceTitle(source.title);
+      setProblem({ ...pub, title: "실전 모드", questions });
+      setSetId("live");
+      setLivePaper(paper);
+      const startedAt = stored?.startedAt ?? Date.now();
+      setLiveStartedAt(startedAt);
+      setLiveLeft(remainingLiveMs(startedAt, Date.now()));
+      setSaved(stored?.saved ?? {});
+      setDrafts(stored?.drafts ?? {});
+      setActiveQuestionId(active);
+      setViewerFileId(
+        stored?.viewerFileId && fileIds.has(stored.viewerFileId) ? stored.viewerFileId : (pub.files[0]?.id ?? null),
+      );
+      setAttachedFileIds((stored?.attachedFileIds ?? []).filter((fileId) => fileIds.has(fileId)));
+      setChatQuestionId(stored?.chatQuestionId && questionIds.has(stored.chatQuestionId) ? stored.chatQuestionId : null);
+      setMessages(Array.isArray(stored?.messages) ? stored.messages : []);
+      setRequestsUsed(typeof stored?.requestsUsed === "number" ? stored.requestsUsed : 0);
+      setReport(stored?.report ?? null);
+      setReviewIds(Array.isArray(stored?.reviewIds) ? stored.reviewIds : []);
+      setView(stored?.view === "result" ? "result" : "exam");
+      setChatDraft("");
+      setChatError(null);
+      setHydrated(true);
+      setLoading(false);
     },
     [serverSets],
   );
@@ -213,36 +316,46 @@ export function ExamApp({ sets: serverSets, buildConfig }: ExamAppProps) {
       });
       setSummaries(bootSummaries);
       const route = routeFromLocation(bootSummaries.map((item) => item.id));
-      setCatalogNotice(route.missing ? "요청한 문제 세트를 찾지 못했습니다." : null);
-      if (!route.id) {
+      if (route.kind === "catalog") {
+        setCatalogNotice(route.missing ? "요청한 문제 세트를 찾지 못했습니다." : null);
         setScreen("catalog");
         setLoading(false);
         return;
       }
+      setCatalogNotice(null);
       setScreen("exam");
+      if (route.kind === "live") {
+        enterLive(true);
+        return;
+      }
       await loadSet(route.id);
     })();
     return () => {
       cancel = true;
     };
-  }, [loadSet, serverSets, buildConfig]);
+  }, [loadSet, enterLive, serverSets, buildConfig]);
 
   useEffect(() => {
     if (summaries.length === 0) return;
     const onPop = () => {
       const route = routeFromLocation(summaries.map((item) => item.id));
-      setCatalogNotice(route.missing ? "요청한 문제 세트를 찾지 못했습니다." : null);
-      if (!route.id) {
+      if (route.kind === "catalog") {
+        setCatalogNotice(route.missing ? "요청한 문제 세트를 찾지 못했습니다." : null);
         setScreen("catalog");
         setLoading(false);
         return;
       }
+      setCatalogNotice(null);
       setScreen("exam");
+      if (route.kind === "live") {
+        enterLive(true);
+        return;
+      }
       void loadSet(route.id);
     };
     window.addEventListener("popstate", onPop);
     return () => window.removeEventListener("popstate", onPop);
-  }, [summaries, loadSet]);
+  }, [summaries, loadSet, enterLive]);
 
   const progressById = useMemo(() => {
     if (screen !== "catalog") return {};
@@ -271,6 +384,29 @@ export function ExamApp({ sets: serverSets, buildConfig }: ExamAppProps) {
 
   useEffect(() => {
     if (!hydrated || !setId) return;
+    if (setId === "live") {
+      if (liveStartedAt == null) return;
+      saveLiveSession(
+        {
+          v: 1,
+          paper: livePaper,
+          startedAt: liveStartedAt,
+          saved,
+          drafts,
+          activeQuestionId,
+          viewerFileId,
+          attachedFileIds,
+          chatQuestionId,
+          messages,
+          requestsUsed,
+          report,
+          view,
+          reviewIds,
+        },
+        localStorage,
+      );
+      return;
+    }
     saveExam(setId, {
       v: 1,
       saved,
@@ -283,6 +419,7 @@ export function ExamApp({ sets: serverSets, buildConfig }: ExamAppProps) {
       requestsUsed,
       report,
       view,
+      reviewIds,
     });
   }, [
     hydrated,
@@ -297,6 +434,9 @@ export function ExamApp({ sets: serverSets, buildConfig }: ExamAppProps) {
     requestsUsed,
     report,
     view,
+    reviewIds,
+    livePaper,
+    liveStartedAt,
   ]);
 
   const measurement = useMemo(() => {
@@ -357,6 +497,31 @@ export function ExamApp({ sets: serverSets, buildConfig }: ExamAppProps) {
   function selectQuestion(id: string) {
     setActiveQuestionId(id);
     setMobilePane("work");
+    if (setId !== "live" || !serverSets) return;
+    const ref = parseLiveQuestionKey(id);
+    if (!ref || ref.setId === sourceSetIdRef.current) return;
+    const source = serverSets.find((set) => set.id === ref.setId);
+    if (!source) return;
+    const pub = toPublicProblemSet(source);
+    sourceSetIdRef.current = source.id;
+    setSourceTitle(source.title);
+    setProblem((prev) => (prev ? { ...prev, id: source.id, passage: pub.passage, files: pub.files, title: "실전 모드" } : prev));
+    setViewerFileId(pub.files[0]?.id ?? null);
+    setAttachedFileIds([]);
+  }
+
+  function chooseChatQuestion(id: string | null) {
+    setChatQuestionId(id);
+    if (setId === "live" && id) selectQuestion(id);
+  }
+
+  function toggleReview(id: string) {
+    setReviewIds((prev) => (prev.includes(id) ? prev.filter((item) => item !== id) : [...prev, id]));
+  }
+
+  function resetActive() {
+    setDrafts((prev) => ({ ...prev, [activeQuestionId]: "" }));
+    setSaved((prev) => ({ ...prev, [activeQuestionId]: "" }));
   }
 
   function setDraft(id: string, value: string) {
@@ -388,10 +553,14 @@ export function ExamApp({ sets: serverSets, buildConfig }: ExamAppProps) {
     setSending(true);
     setChatError(null);
     try {
+      const liveRef = setId === "live" ? parseLiveQuestionKey(chatQuestionId ?? "") : null;
+      const targetSetId = liveRef?.setId ?? problem.id;
+      const targetQuestionId = liveRef ? liveRef.questionId : (chatQuestionId ?? "");
+      const allowed = new Set((serverSets?.find((set) => set.id === targetSetId)?.files ?? problem.files).map((file) => file.id));
       const data = await engine.send({
-        problemSetId: problem.id,
-        questionId: chatQuestionId ?? "",
-        fileIds: attachedFileIds,
+        problemSetId: targetSetId,
+        questionId: targetQuestionId,
+        fileIds: attachedFileIds.filter((fileId) => allowed.has(fileId)),
         message: chatDraft,
         requestsUsed,
       });
@@ -443,14 +612,28 @@ export function ExamApp({ sets: serverSets, buildConfig }: ExamAppProps) {
   }
 
   async function confirmGrade() {
-    if (!problem || !engine || grading) return;
+    if (!problem || gradingRef.current) return;
+    if (setId !== "live" && !engine) return;
+    gradingRef.current = true;
     const answers = mergedAnswers();
     setSaved(answers);
     setDrafts(answers);
     setGrading(true);
     setGradeError(null);
+    const stayOnExam = window.matchMedia("(min-width: 1024px)").matches;
     try {
-      const data = engine.grade(problem.id, answers);
+      if (setId === "live") {
+        if (!serverSets) {
+          setGradeError("채점에 실패했습니다. 다시 시도하세요.");
+          return;
+        }
+        const data = gradeLivePaper(serverSets, livePaper, answers);
+        setReport(data);
+        setView(stayOnExam ? "exam" : "result");
+        setGradeOpen(false);
+        return;
+      }
+      const data = engine!.grade(problem.id, answers);
       if ("error" in data) {
         setGradeError(data.message);
         return;
@@ -461,11 +644,12 @@ export function ExamApp({ sets: serverSets, buildConfig }: ExamAppProps) {
         total: data.total,
       }, localStorage);
       setReport(data);
-      setView("result");
+      setView(stayOnExam ? "exam" : "result");
       setGradeOpen(false);
     } catch {
       setGradeError("채점에 실패했습니다. 다시 시도하세요.");
     } finally {
+      gradingRef.current = false;
       setGrading(false);
     }
   }
@@ -475,8 +659,14 @@ export function ExamApp({ sets: serverSets, buildConfig }: ExamAppProps) {
     setSaved({});
     setDrafts({});
     setReport(null);
+    setReviewIds([]);
     setView("exam");
     setRequestsUsed(0);
+    if (setId === "live") {
+      const startedAt = Date.now();
+      setLiveStartedAt(startedAt);
+      setLiveLeft(remainingLiveMs(startedAt, startedAt));
+    }
     setActiveQuestionId(problem.questions[0].id);
     setMessages((prev) => [
       ...prev,
@@ -489,6 +679,22 @@ export function ExamApp({ sets: serverSets, buildConfig }: ExamAppProps) {
     ]);
     setNewAttemptOpen(false);
   }
+
+  useEffect(() => {
+    confirmGradeRef.current = () => {
+      void confirmGrade();
+    };
+  });
+
+  useEffect(() => {
+    if (screen !== "exam" || setId !== "live" || liveStartedAt == null || report) return;
+    const timer = window.setInterval(() => {
+      const left = remainingLiveMs(liveStartedAt, Date.now());
+      setLiveLeft(left);
+      if (left === 0) confirmGradeRef.current();
+    }, 250);
+    return () => window.clearInterval(timer);
+  }, [screen, setId, liveStartedAt, report]);
 
   function startTour() {
     setView("exam");
@@ -535,7 +741,13 @@ export function ExamApp({ sets: serverSets, buildConfig }: ExamAppProps) {
 
   if (screen === "catalog") {
     return (
-      <SetCatalog summaries={summaries} progress={progressById} notice={catalogNotice} onOpen={openSet} />
+      <SetCatalog
+        summaries={summaries}
+        progress={progressById}
+        notice={catalogNotice}
+        onOpen={openSet}
+        onLive={() => enterLive(false)}
+      />
     );
   }
 
@@ -581,14 +793,23 @@ export function ExamApp({ sets: serverSets, buildConfig }: ExamAppProps) {
     measurement,
     remaining,
     locked,
+    reviewIds,
+    materialTitle: setId === "live" ? sourceTitle : problem.title,
     setMobilePane,
     selectQuestion,
+    toggleReview,
+    resetActive,
+    requestGrade: () => {
+      setGradeError(null);
+      setGradeOpen(true);
+    },
+    showResult: () => setView("result"),
     setDraft,
     saveActive,
     openFile,
     attachFile,
     detachFile: (id: string) => setAttachedFileIds((prev) => prev.filter((item) => item !== id)),
-    setChatQuestionId,
+    setChatQuestionId: chooseChatQuestion,
     setChatDraft,
     sendChat,
     switchSet: (id: string) => {
@@ -597,10 +818,11 @@ export function ExamApp({ sets: serverSets, buildConfig }: ExamAppProps) {
   };
 
   const settingsInsecure = isInsecureRemoteHttp(settingsDraft.baseUrl);
+  const clockLabel = setId === "live" ? formatTimer(liveLeft) : null;
 
   return (
     <ExamProvider value={api}>
-      <div className="shell">
+      <div className={`shell exam-shell${view === "exam" ? " desk-exam" : ""}`}>
         <header className="header">
           <div className="brand">
             <span className="mark">모</span>
@@ -618,6 +840,11 @@ export function ExamApp({ sets: serverSets, buildConfig }: ExamAppProps) {
             <span className={`pill ${remaining === 0 ? "warn" : ""}`} data-testid="remaining-requests">
               남은 AI 질문 {remaining}회
             </span>
+            {clockLabel ? (
+              <span className="pill live-timer" data-testid="live-timer-mobile">
+                {clockLabel}
+              </span>
+            ) : null}
             <button type="button" className="btn ghost" onClick={openSettings}>
               AI 설정
             </button>
@@ -648,11 +875,43 @@ export function ExamApp({ sets: serverSets, buildConfig }: ExamAppProps) {
           <ResultScreen report={report} onReview={() => setView("exam")} onNewAttempt={() => setNewAttemptOpen(true)} />
         ) : (
           <>
+            <div className="crumb-bar desktop-exam">
+              <p className="crumb" data-testid="exam-crumb">
+                <span>AI 활용평가 연습</span>
+                <span aria-hidden="true"> &gt; </span>
+                <span>AI 활용평가</span>
+                <span aria-hidden="true"> &gt; </span>
+                <span className="crumb-title">{problem.title}</span>
+              </p>
+              <div className="crumb-actions">
+                {clockLabel ? (
+                  <span className="live-timer" data-testid="live-timer">
+                    {clockLabel}
+                  </span>
+                ) : null}
+                <button type="button" className="btn ghost small" onClick={showCatalog}>
+                  문제 목록
+                </button>
+                <button type="button" className="btn ghost small" onClick={openSettings}>
+                  AI 설정
+                </button>
+                <button type="button" className="btn ghost small" onClick={startTour}>
+                  둘러보기
+                </button>
+              </div>
+            </div>
             <ExamPanes>
-              <MaterialsPane />
-              <WorkspacePane />
+              <div className="slot-left">
+                <QuestionRail />
+                <MaterialsPane />
+              </div>
+              <div className="slot-center">
+                <DesktopCenter />
+                <WorkspacePane />
+              </div>
               <AiPane />
             </ExamPanes>
+            <ExamFooter />
             <nav className="mobile-tabs" aria-label="화면 전환">
               {(
                 [

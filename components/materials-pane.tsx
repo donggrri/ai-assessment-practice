@@ -17,7 +17,7 @@ function statusOf(saved: string, draft: string | undefined): { label: string; cl
 export function MaterialsPane() {
   const exam = useExam();
   return (
-    <aside className={`pane pane-left ${exam.mobilePane === "materials" ? "active" : ""}`}>
+    <aside className={`pane pane-left mobile-exam ${exam.mobilePane === "materials" ? "active" : ""}`}>
       <section className="section questions" data-tour="question-list">
         <h2 className="section-label">문제</h2>
         <div className="scroll">

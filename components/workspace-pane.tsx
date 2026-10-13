@@ -1,5 +1,6 @@
 "use client";
 
+import { questionFormLabel } from "@/lib/live-exam";
 import { CopyGuard } from "./copy-guard";
 import { useExam } from "./exam-context";
 import { FileViewer } from "./file-viewer";
@@ -13,21 +14,21 @@ export function WorkspacePane() {
   const value = exam.drafts[question.id] ?? exam.saved[question.id] ?? "";
 
   return (
-    <main className={`pane pane-main ${exam.mobilePane === "work" ? "active" : ""}`}>
+    <main className={`pane pane-main mobile-exam ${exam.mobilePane === "work" ? "active" : ""}`}>
       {exam.locked ? (
         <p className="banner">채점이 끝났습니다. 답안은 수정할 수 없습니다. 대화 기록은 그대로 남아 있습니다.</p>
       ) : null}
       <div className="work">
         <article className="question-card" data-tour="question-body">
           <p className="score-kicker">
-            {question.type === "multiple" ? "객관식" : "주관식"} · {question.number}번
+            {questionFormLabel(question)} · {question.number}번
           </p>
           <CopyGuard enabled={exam.config.copyProtection}>
             <h2>
               {question.number}. {question.prompt}
             </h2>
           </CopyGuard>
-          {question.type === "multiple" ? (
+          {questionFormLabel(question) === "객관식" ? (
             <div>
               {question.choices?.map((choice) => (
                 <label key={choice.id} className={`choice ${value === choice.id ? "selected" : ""}`}>

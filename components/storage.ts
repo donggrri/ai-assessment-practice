@@ -12,6 +12,7 @@ export type ExamPersist = {
   requestsUsed: number;
   report: GradeReport | null;
   view: "exam" | "result";
+  reviewIds?: string[];
 };
 
 export function storageKey(setId: string): string {

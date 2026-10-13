@@ -34,8 +34,14 @@ export type ExamApi = {
   measurement: ContextMeasurement;
   remaining: number;
   locked: boolean;
+  reviewIds: string[];
+  materialTitle: string;
   setMobilePane: (pane: MobilePane) => void;
   selectQuestion: (id: string) => void;
+  toggleReview: (id: string) => void;
+  resetActive: () => void;
+  requestGrade: () => void;
+  showResult: () => void;
   setDraft: (id: string, value: string) => void;
   saveActive: () => void;
   openFile: (id: string) => void;

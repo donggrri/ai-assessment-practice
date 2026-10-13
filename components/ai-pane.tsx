@@ -20,7 +20,14 @@ export function AiPane() {
   return (
     <aside className={`pane pane-ai ${exam.mobilePane === "ai" ? "active" : ""}`} data-tour="ai-panel">
       <div className="ai-head">
-        <h2>AI 어시스트</h2>
+        <div className="ai-head-row">
+          <h2>AI 어시스트</h2>
+          {exam.remaining === 0 ? (
+            <span className="exhausted" data-testid="requests-exhausted">
+              횟수 소진
+            </span>
+          ) : null}
+        </div>
         <p>
           {exam.config.mockMode
             ? "모의 응답 모드입니다. 헤더의 AI 설정에서 API 키를 저장하면 선택한 모델에 질문합니다. "
@@ -71,7 +78,10 @@ export function AiPane() {
             id="chat-question"
             value={exam.chatQuestionId ?? ""}
             disabled={exam.locked}
-            onChange={(event) => exam.setChatQuestionId(event.target.value || null)}
+            onChange={(event) => {
+              const next = event.target.value || null;
+              exam.setChatQuestionId(next);
+            }}
           >
             <option value="">선택 안 함 (공통 지문만 전달)</option>
             {exam.problem.questions.map((question) => (
@@ -81,7 +91,27 @@ export function AiPane() {
             ))}
           </select>
         </div>
-        <label style={{ marginTop: 8 }}>첨부 파일</label>
+        <label htmlFor="chat-file" style={{ marginTop: 8 }}>
+          첨부 파일
+        </label>
+        <select
+          id="chat-file"
+          aria-label="첨부 파일"
+          data-tour="file-attach"
+          value=""
+          disabled={exam.locked}
+          onChange={(event) => {
+            const fileId = event.target.value;
+            if (fileId) exam.attachFile(fileId);
+          }}
+        >
+          <option value="">파일 선택</option>
+          {exam.problem.files.map((file) => (
+            <option key={file.id} value={file.id} disabled={exam.attachedFileIds.includes(file.id)}>
+              {file.name}
+            </option>
+          ))}
+        </select>
         {files.length === 0 ? (
           <p className="note">첨부된 파일 없음. 문제·자료의 파일에서 「AI 질문에 추가」를 누르세요.</p>
         ) : (
