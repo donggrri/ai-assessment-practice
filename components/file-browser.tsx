@@ -3,6 +3,7 @@
 import { useEffect, useMemo, useState } from "react";
 import { estimateTokens } from "@/lib/tokens";
 import type { ExamFile } from "@/lib/types";
+import { CopyGuard } from "./copy-guard";
 import { FileViewer } from "./file-viewer";
 
 const ZOOM_MIN = 50;
@@ -48,10 +49,12 @@ export function FileBrowser({
   files,
   activeId,
   onOpen,
+  copyProtection = false,
 }: {
   files: ExamFile[];
   activeId: string | null;
   onOpen: (id: string) => void;
+  copyProtection?: boolean;
 }) {
   const [query, setQuery] = useState("");
   const [searchOpen, setSearchOpen] = useState(false);
@@ -139,23 +142,25 @@ export function FileBrowser({
           <div className="file-stage-bar">
             <strong data-testid="file-preview-name">{active ? active.name : "파일 없음"}</strong>
             <span className="file-stage-tokens">{active ? `${formatTokens(estimateTokens(active.content))} 토큰` : ""}</span>
-            <div className="zoom-controls" aria-label="미리보기 배율">
-              <button type="button" onClick={() => setZoom((value) => Math.max(ZOOM_MIN, value - 10))} aria-label="축소">
-                −
-              </button>
-              <span>{zoom}%</span>
-              <button type="button" onClick={() => setZoom((value) => Math.min(ZOOM_MAX, value + 10))} aria-label="확대">
-                +
-              </button>
-            </div>
             <button type="button" className="file-full-btn" aria-label={full ? "전체화면 닫기" : "전체화면"} onClick={() => setFull((value) => !value)}>
               {full ? "닫기" : "전체화면"}
             </button>
           </div>
           <div className="desktop-preview">
-            <div className="desktop-zoom" style={{ zoom: `${zoom}%` }}>
-              {active ? <FileViewer file={active} /> : <p className="empty-chat">자료 파일이 없습니다.</p>}
-            </div>
+            <CopyGuard enabled={copyProtection} className="preview-guard">
+              <div className="desktop-zoom" style={{ zoom: `${zoom}%` }}>
+                {active ? <FileViewer file={active} /> : <p className="empty-chat">자료 파일이 없습니다.</p>}
+              </div>
+            </CopyGuard>
+          </div>
+          <div className="zoom-overlay" aria-label="미리보기 배율">
+            <button type="button" onClick={() => setZoom((value) => Math.max(ZOOM_MIN, value - 10))} aria-label="축소">
+              −
+            </button>
+            <span>{zoom}%</span>
+            <button type="button" onClick={() => setZoom((value) => Math.min(ZOOM_MAX, value + 10))} aria-label="확대">
+              +
+            </button>
           </div>
         </section>
       </div>

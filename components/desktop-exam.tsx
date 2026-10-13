@@ -12,6 +12,7 @@ import {
   splitByRatio,
   writePanelRatio,
 } from "@/lib/panel-split";
+import { CopyGuard } from "./copy-guard";
 import { FileBrowser } from "./file-browser";
 import { useExam } from "./exam-context";
 
@@ -159,13 +160,14 @@ export function DesktopCenter() {
         data-tour="file-list"
         style={centerHeight > 0 ? { height: split.primary, flex: "none" } : undefined}
       >
-        <div id="exam-passage" className="desktop-passage">
-          {exam.problem.passage}
-        </div>
+        <CopyGuard enabled={exam.config.copyProtection} className="desktop-passage">
+          <div id="exam-passage">{exam.problem.passage}</div>
+        </CopyGuard>
         <FileBrowser
           files={exam.problem.files}
           activeId={exam.viewerFileId}
           onOpen={(id) => exam.openFile(id)}
+          copyProtection={exam.config.copyProtection}
         />
       </section>
       <div

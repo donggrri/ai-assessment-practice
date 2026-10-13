@@ -23,6 +23,18 @@ import {
   type LiveRef,
   type LiveSession,
 } from "@/lib/live-exam";
+import {
+  ASK_COOLDOWN_MS,
+  blocksMaterialPaste as materialPasteBlocked,
+  clearAiGuard,
+  emptyAiGuard,
+  isSimilarAsk,
+  loadAiGuard,
+  loadStrictConstraints,
+  saveAiGuard,
+  saveStrictConstraints,
+  type AiGuardState,
+} from "@/lib/ai-constraints";
 import { remainingRequests } from "@/lib/requests";
 import { toPublicProblemSet, toSummary } from "@/lib/public-problem";
 import { attemptStarted, describeProgress, pickBestScore, type ProgressView } from "@/lib/set-progress";
@@ -139,6 +151,9 @@ export function ExamApp({ sets: serverSets, buildConfig }: ExamAppProps) {
   const [chatDraft, setChatDraft] = useState("");
   const [sending, setSending] = useState(false);
   const [chatError, setChatError] = useState<string | null>(null);
+  const [strictConstraints, setStrictConstraintsState] = useState(true);
+  const [guard, setGuard] = useState<AiGuardState>(emptyAiGuard);
+  const [cooldownNow, setCooldownNow] = useState(0);
   const [mobilePane, setMobilePane] = useState<MobilePane>("work");
   const [tourIndex, setTourIndex] = useState<number | null>(null);
   const [gradeOpen, setGradeOpen] = useState(false);
@@ -228,6 +243,8 @@ export function ExamApp({ sets: serverSets, buildConfig }: ExamAppProps) {
         setSourceTitle(full.title);
         setChatDraft("");
         setChatError(null);
+        setGuard(loadAiGuard(localStorage, id));
+        setCooldownNow(Date.now());
         setHydrated(true);
         setLoading(false);
       } catch {
@@ -247,6 +264,7 @@ export function ExamApp({ sets: serverSets, buildConfig }: ExamAppProps) {
       setLoading(true);
       setError(null);
       setHydrated(false);
+      if (!resume) clearAiGuard(localStorage, "live");
       const stored: LiveSession | null = resume ? loadLiveSession(localStorage) : null;
       const paper = stored?.paper.length ? stored.paper : buildLivePaper(serverSets);
       const questions = liveQuestions(serverSets, paper);
@@ -288,6 +306,8 @@ export function ExamApp({ sets: serverSets, buildConfig }: ExamAppProps) {
       setView(stored?.view === "result" ? "result" : "exam");
       setChatDraft("");
       setChatError(null);
+      setGuard(resume ? loadAiGuard(localStorage, "live") : emptyAiGuard());
+      setCooldownNow(Date.now());
       setHydrated(true);
       setLoading(false);
     },
@@ -306,6 +326,7 @@ export function ExamApp({ sets: serverSets, buildConfig }: ExamAppProps) {
       }
 
       const settings = loadLlmSettings();
+      setStrictConstraintsState(loadStrictConstraints(localStorage));
       const bootSummaries = serverSets.map(toSummary);
 
       if (cancel) return;
@@ -547,9 +568,26 @@ export function ExamApp({ sets: serverSets, buildConfig }: ExamAppProps) {
     setMobilePane("work");
   }
 
+  function rememberGuard(next: AiGuardState) {
+    if (!setId) return;
+    setGuard(next);
+    setCooldownNow(Date.now());
+    saveAiGuard(localStorage, setId, next);
+  }
+
+  function setStrictConstraints(enabled: boolean) {
+    setStrictConstraintsState(enabled);
+    saveStrictConstraints(localStorage, enabled);
+  }
+
   async function sendChat() {
-    if (!problem || !config || !engine || locked || sending) return;
+    if (!problem || !config || !engine || !setId || locked || sending) return;
     if (chatDraft.trim() === "" || measurement.over || remaining === 0) return;
+    if (strictConstraints && guard.cooldownUntil > Date.now()) return;
+    const sent = chatDraft;
+    const cooling = strictConstraints;
+    const until = cooling ? Date.now() + ASK_COOLDOWN_MS : 0;
+    if (cooling) rememberGuard({ v: 1, lastMessage: guard.lastMessage, cooldownUntil: until });
     setSending(true);
     setChatError(null);
     try {
@@ -565,6 +603,7 @@ export function ExamApp({ sets: serverSets, buildConfig }: ExamAppProps) {
         requestsUsed,
       });
       if (!data.ok) {
+        if (cooling) rememberGuard({ v: 1, lastMessage: guard.lastMessage, cooldownUntil: 0 });
         if (data.error === "request_limit") setRequestsUsed(config.aiRequestLimit);
         setChatError(data.message);
         return;
@@ -595,7 +634,9 @@ export function ExamApp({ sets: serverSets, buildConfig }: ExamAppProps) {
       setMessages((prev) => [...prev, userMessage, assistant]);
       setRequestsUsed(data.requestsUsed);
       setChatDraft("");
+      if (cooling) rememberGuard({ v: 1, lastMessage: sent, cooldownUntil: until });
     } catch {
+      if (cooling) rememberGuard({ v: 1, lastMessage: guard.lastMessage, cooldownUntil: 0 });
       setChatError("네트워크 오류로 보내지 못했습니다. 횟수는 차감되지 않았습니다.");
     } finally {
       setSending(false);
@@ -666,6 +707,9 @@ export function ExamApp({ sets: serverSets, buildConfig }: ExamAppProps) {
       const startedAt = Date.now();
       setLiveStartedAt(startedAt);
       setLiveLeft(remainingLiveMs(startedAt, startedAt));
+      clearAiGuard(localStorage, "live");
+      setGuard(emptyAiGuard());
+      setCooldownNow(Date.now());
     }
     setActiveQuestionId(problem.questions[0].id);
     setMessages((prev) => [
@@ -685,6 +729,14 @@ export function ExamApp({ sets: serverSets, buildConfig }: ExamAppProps) {
       void confirmGrade();
     };
   });
+
+  useEffect(() => {
+    if (!strictConstraints || guard.cooldownUntil <= Date.now()) return;
+    const timer = window.setInterval(() => {
+      setCooldownNow(Date.now());
+    }, 250);
+    return () => window.clearInterval(timer);
+  }, [strictConstraints, guard.cooldownUntil]);
 
   useEffect(() => {
     if (screen !== "exam" || setId !== "live" || liveStartedAt == null || report) return;
@@ -771,6 +823,13 @@ export function ExamApp({ sets: serverSets, buildConfig }: ExamAppProps) {
     );
   }
 
+  const cooldownLeftMs =
+    strictConstraints && cooldownNow > 0 ? Math.max(0, guard.cooldownUntil - cooldownNow) : 0;
+  const similarWarning =
+    strictConstraints && isSimilarAsk(chatDraft, guard.lastMessage)
+      ? "직전 질문과 거의 같습니다. 질문을 바꿔 보세요."
+      : null;
+
   const api = {
     config,
     problem,
@@ -812,6 +871,16 @@ export function ExamApp({ sets: serverSets, buildConfig }: ExamAppProps) {
     setChatQuestionId: chooseChatQuestion,
     setChatDraft,
     sendChat,
+    strictConstraints,
+    setStrictConstraints,
+    cooldownLeftMs,
+    similarWarning,
+    blocksMaterialPaste: (text: string) =>
+      materialPasteBlocked(text, [
+        problem.passage,
+        ...problem.files.map((file) => file.content),
+        ...problem.questions.map((question) => `${question.prompt} ${(question.choices ?? []).map((choice) => choice.text).join(" ")}`),
+      ]),
     switchSet: (id: string) => {
       if (id !== setId) openSet(id);
     },
@@ -941,6 +1010,19 @@ export function ExamApp({ sets: serverSets, buildConfig }: ExamAppProps) {
             <h2 id="settings-title">AI 설정</h2>
             <p>
               이 브라우저에만 저장되며 저장소나 빌드에 포함되지 않습니다. 질문할 때 입력한 주소로 직접 전송됩니다.
+            </p>
+            <label className="strict-toggle" htmlFor="strict-off">
+              <input
+                id="strict-off"
+                data-testid="strict-off"
+                type="checkbox"
+                checked={!strictConstraints}
+                onChange={(event) => setStrictConstraints(!event.target.checked)}
+              />
+              실전 제약 끄기
+            </label>
+            <p className="note">
+              기본으로 질문 후 30초 대기, 직전과 비슷한 질문 경고, 지문·자료 붙여넣기 차단이 켜져 있습니다. 체크하면 이번 연습에서만 그 제약을 끕니다.
             </p>
             <div className="composer" style={{ marginTop: 12 }}>
               <label htmlFor="llm-api-key">API 키</label>

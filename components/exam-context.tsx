@@ -50,6 +50,11 @@ export type ExamApi = {
   setChatQuestionId: (id: string | null) => void;
   setChatDraft: (value: string) => void;
   sendChat: () => void;
+  strictConstraints: boolean;
+  setStrictConstraints: (enabled: boolean) => void;
+  cooldownLeftMs: number;
+  similarWarning: string | null;
+  blocksMaterialPaste: (text: string) => boolean;
   switchSet: (id: string) => void;
 };
 

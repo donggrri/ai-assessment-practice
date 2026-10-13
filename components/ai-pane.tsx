@@ -1,10 +1,14 @@
 "use client";
 
+import { useState } from "react";
 import { useExam } from "./exam-context";
 import { MarkdownBody } from "./markdown-body";
 
 export function AiPane() {
   const exam = useExam();
+  const [pasteWarning, setPasteWarning] = useState(false);
+  const cooling = exam.strictConstraints && exam.cooldownLeftMs > 0;
+  const cooldownSeconds = Math.ceil(exam.cooldownLeftMs / 1000);
   const files = exam.attachedFileIds
     .map((id) => exam.problem.files.find((file) => file.id === id))
     .filter((file): file is NonNullable<typeof file> => Boolean(file));
@@ -12,10 +16,13 @@ export function AiPane() {
   const ratio = limit > 0 ? Math.min(100, (exam.measurement.charCount / limit) * 100) : 100;
   const placeholder = exam.locked
     ? "채점이 끝나 질문을 보낼 수 없습니다."
-    : exam.remaining === 0
-      ? "AI 질문 횟수를 모두 사용했습니다."
-      : "질문을 입력하세요. Enter로 보내고, Shift+Enter로 줄바꿈합니다.";
-  const blocked = exam.locked || exam.remaining === 0 || exam.sending || exam.measurement.over || exam.chatDraft.trim() === "";
+    : cooling
+      ? `다음 질문까지 ${cooldownSeconds}초`
+      : exam.remaining === 0
+        ? "AI 질문 횟수를 모두 사용했습니다."
+        : "질문을 입력하세요. Enter로 보내고, Shift+Enter로 줄바꿈합니다.";
+  const blocked =
+    exam.locked || cooling || exam.remaining === 0 || exam.sending || exam.measurement.over || exam.chatDraft.trim() === "";
 
   return (
     <aside className={`pane pane-ai ${exam.mobilePane === "ai" ? "active" : ""}`} data-tour="ai-panel">
@@ -132,8 +139,21 @@ export function AiPane() {
           data-testid="chat-input"
           value={exam.chatDraft}
           placeholder={placeholder}
-          disabled={exam.locked || exam.remaining === 0 || exam.sending}
-          onChange={(event) => exam.setChatDraft(event.target.value)}
+          disabled={exam.locked || cooling || exam.remaining === 0 || exam.sending}
+          onChange={(event) => {
+            setPasteWarning(false);
+            exam.setChatDraft(event.target.value);
+          }}
+          onPaste={(event) => {
+            if (!exam.strictConstraints) return;
+            const text = event.clipboardData.getData("text");
+            if (!exam.blocksMaterialPaste(text)) {
+              setPasteWarning(false);
+              return;
+            }
+            event.preventDefault();
+            setPasteWarning(true);
+          }}
           onKeyDown={(event) => {
             if (event.key === "Enter" && !event.shiftKey) {
               event.preventDefault();
@@ -168,6 +188,21 @@ export function AiPane() {
         {exam.remaining === 0 && !exam.locked ? (
           <p className="warn" role="status">
             AI 질문 횟수를 모두 사용했습니다.
+          </p>
+        ) : null}
+        {cooling ? (
+          <p className="warn" role="status" data-testid="ask-cooldown">
+            다음 질문까지 {cooldownSeconds}초
+          </p>
+        ) : null}
+        {exam.similarWarning ? (
+          <p className="warn" role="status" data-testid="similar-warning">
+            {exam.similarWarning}
+          </p>
+        ) : null}
+        {pasteWarning ? (
+          <p className="warn" role="status" data-testid="paste-warning">
+            지문이나 자료 텍스트는 붙여넣을 수 없습니다. 질문은 직접 입력하세요.
           </p>
         ) : null}
         {exam.chatError ? (

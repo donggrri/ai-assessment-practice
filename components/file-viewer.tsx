@@ -22,7 +22,7 @@ export function FileViewer({ file }: { file: ExamFile }) {
   if (file.kind === "pdf" && src) {
     return (
       <div className="viewer-media">
-        <iframe className="viewer-pdf" src={src} title={file.name} />
+        <iframe className="viewer-pdf" src={`${src}#toolbar=0&navpanes=0`} title={file.name} />
         <details className="viewer-fallback">
           <summary>추출 텍스트</summary>
           <MarkdownBody content={file.content} />

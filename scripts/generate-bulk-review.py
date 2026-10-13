@@ -11,7 +11,6 @@ import json
 from pathlib import Path
 
 from fontTools.ttLib import TTCollection
-from fpdf import FPDF
 from PIL import Image, ImageDraw, ImageFont
 
 ROOT = Path(__file__).resolve().parents[1]
@@ -39,18 +38,9 @@ def ensure_font() -> None:
 
 
 def pdf_from_lines(path: Path, title: str, lines: list[str]) -> None:
-    pdf = FPDF(format="A4")
-    pdf.set_auto_page_break(auto=True, margin=14)
-    pdf.add_font("wqy", "", str(FONT_TTF))
-    pdf.add_page()
-    pdf.set_font("wqy", size=14)
-    pdf.multi_cell(0, 8, title, new_x="LMARGIN", new_y="NEXT")
-    pdf.ln(2)
-    pdf.set_font("wqy", size=9)
-    for line in lines:
-        pdf.multi_cell(0, 5, line if line else " ", new_x="LMARGIN", new_y="NEXT")
-    path.parent.mkdir(parents=True, exist_ok=True)
-    pdf.output(str(path))
+    from official_pdf import render_official_pdf
+
+    render_official_pdf(path, title, "\n".join(lines), path.name)
 
 
 def pad_notes(title: str, paragraphs: int) -> str:
