@@ -1,12 +1,19 @@
 "use client";
 
-import { useState } from "react";
+import { useEffect, useRef, useState, type PointerEvent } from "react";
 import { questionFormLabel } from "@/lib/live-exam";
-import { FileViewer } from "./file-viewer";
+import {
+  ANSWER_MIN,
+  PASSAGE_MIN,
+  PASSAGE_RATIO_DEFAULT,
+  PASSAGE_RATIO_KEY,
+  SPLITTER_SIZE,
+  readPanelRatio,
+  splitByRatio,
+  writePanelRatio,
+} from "@/lib/panel-split";
+import { FileBrowser } from "./file-browser";
 import { useExam } from "./exam-context";
-
-const ZOOM_MIN = 50;
-const ZOOM_MAX = 200;
 
 export function QuestionRail() {
   const exam = useExam();
@@ -39,58 +46,143 @@ export function QuestionRail() {
 
 export function DesktopCenter() {
   const exam = useExam();
-  const [zoom, setZoom] = useState(100);
-  const active = exam.problem.questions.find((question) => question.id === exam.activeQuestionId) ?? exam.problem.questions[0];
-  const file = exam.problem.files.find((item) => item.id === exam.viewerFileId) ?? exam.problem.files[0] ?? null;
+  const centerRef = useRef<HTMLDivElement>(null);
+  const ratioRef = useRef(PASSAGE_RATIO_DEFAULT);
+  const draggingRef = useRef(false);
+  const [ratio, setRatio] = useState(PASSAGE_RATIO_DEFAULT);
+  const [centerHeight, setCenterHeight] = useState(0);
+  const [dragging, setDragging] = useState(false);
+  const questions = exam.problem.questions;
+  const activeIndex = Math.max(0, questions.findIndex((question) => question.id === exam.activeQuestionId));
+  const active = questions[activeIndex] ?? questions[0];
   const form = active ? questionFormLabel(active) : "주관식";
+  const scoreLabel = exam.report ? String(exam.report.score) : "-";
+
+  function moveQuestion(step: number) {
+    const next = questions[activeIndex + step];
+    if (!next) return;
+    exam.selectQuestion(next.id);
+    document.getElementById(`desktop-q-${next.id}`)?.scrollIntoView({ block: "start" });
+  }
+  const split = splitByRatio(
+    Math.max(0, centerHeight - SPLITTER_SIZE),
+    ratio,
+    PASSAGE_MIN,
+    ANSWER_MIN,
+    PASSAGE_RATIO_DEFAULT,
+  );
+
+  useEffect(() => {
+    const node = centerRef.current;
+    if (!node) return;
+    const stored = readPanelRatio(window.localStorage, PASSAGE_RATIO_KEY);
+    const measure = () => {
+      setCenterHeight(node.clientHeight);
+    };
+    const hydrate = () => {
+      if (stored != null) {
+        ratioRef.current = stored;
+        setRatio(stored);
+      }
+      measure();
+    };
+    hydrate();
+    const observer = new ResizeObserver(measure);
+    observer.observe(node);
+    return () => {
+      observer.disconnect();
+      document.body.classList.remove("passage-split-dragging");
+    };
+  }, []);
+
+  function remember(next: number) {
+    ratioRef.current = next;
+    setRatio(next);
+  }
+
+  function onPointerDown(event: PointerEvent<HTMLDivElement>) {
+    draggingRef.current = true;
+    setDragging(true);
+    document.body.classList.add("passage-split-dragging");
+    event.currentTarget.setPointerCapture(event.pointerId);
+  }
+
+  function onPointerMove(event: PointerEvent<HTMLDivElement>) {
+    if (!draggingRef.current || !centerRef.current) return;
+    const rect = centerRef.current.getBoundingClientRect();
+    const flexible = Math.max(1, rect.height - SPLITTER_SIZE);
+    remember((event.clientY - rect.top) / flexible);
+  }
+
+  function finishDrag() {
+    if (!draggingRef.current) return;
+    draggingRef.current = false;
+    setDragging(false);
+    document.body.classList.remove("passage-split-dragging");
+    writePanelRatio(window.localStorage, PASSAGE_RATIO_KEY, ratioRef.current);
+  }
+
+  function onDoubleClick() {
+    remember(PASSAGE_RATIO_DEFAULT);
+    writePanelRatio(window.localStorage, PASSAGE_RATIO_KEY, PASSAGE_RATIO_DEFAULT);
+  }
 
   function scrollToPassage() {
     document.getElementById("exam-passage")?.scrollIntoView({ block: "start" });
   }
 
   function scrollToQuestion(id: string) {
-    exam.selectQuestion(id);
-    document.getElementById(`desktop-q-${id}`)?.scrollIntoView({ block: "start" });
+    const index = questions.findIndex((question) => question.id === id);
+    if (index >= 0) moveQuestion(index - activeIndex);
   }
 
   return (
-    <div className="desktop-center desktop-exam">
-      <section className="desktop-viewer" data-tour="file-list">
-        <div className="desktop-viewer-bar">
-          <div className="file-picks">
-            {exam.problem.files.map((item) => (
-              <button
-                key={item.id}
-                type="button"
-                className={file?.id === item.id ? "active" : ""}
-                onClick={() => exam.openFile(item.id)}
-              >
-                {item.name}
-              </button>
-            ))}
-          </div>
-          <div className="zoom-controls" aria-label="미리보기 배율">
-            <button type="button" onClick={() => setZoom((value) => Math.max(ZOOM_MIN, value - 10))} aria-label="축소">
-              −
-            </button>
-            <span>{zoom}%</span>
-            <button type="button" onClick={() => setZoom((value) => Math.min(ZOOM_MAX, value + 10))} aria-label="확대">
-              +
-            </button>
-          </div>
-        </div>
-        <p className="viewer-kicker">
-          {active ? `${active.number}. ${form}` : "자료"} · {exam.materialTitle}
+    <div ref={centerRef} className={`desktop-center desktop-exam${dragging ? " splitting" : ""}`}>
+      <div className="q-stepper" data-testid="question-stepper">
+        <button type="button" aria-label="이전 문제" onClick={() => moveQuestion(-1)} disabled={!active || activeIndex <= 0}>
+          ‹
+        </button>
+        <p>
+          {active ? `${active.number}. ${form}` : "문제"} <span>( {scoreLabel} / 100 )</span>
         </p>
+        <button
+          type="button"
+          aria-label="다음 문제"
+          onClick={() => moveQuestion(1)}
+          disabled={!active || activeIndex >= questions.length - 1}
+        >
+          ›
+        </button>
+      </div>
+      <section
+        className="desktop-viewer"
+        data-tour="file-list"
+        style={centerHeight > 0 ? { height: split.primary, flex: "none" } : undefined}
+      >
         <div id="exam-passage" className="desktop-passage">
           {exam.problem.passage}
         </div>
-        <div className="desktop-preview">
-          <div className="desktop-zoom" style={{ zoom: `${zoom}%` }}>
-            {file ? <FileViewer file={file} /> : <p className="empty-chat">자료 파일이 없습니다.</p>}
-          </div>
-        </div>
+        <FileBrowser
+          files={exam.problem.files}
+          activeId={exam.viewerFileId}
+          onOpen={(id) => exam.openFile(id)}
+        />
       </section>
+      <div
+        className="passage-resizer"
+        role="separator"
+        aria-orientation="horizontal"
+        aria-label="지문과 답안 사이 높이 조절"
+        aria-valuemin={PASSAGE_MIN}
+        aria-valuemax={Math.max(PASSAGE_MIN, Math.max(0, centerHeight - SPLITTER_SIZE) - ANSWER_MIN)}
+        aria-valuenow={split.primary}
+        data-testid="passage-resizer"
+        onPointerDown={onPointerDown}
+        onPointerMove={onPointerMove}
+        onPointerUp={finishDrag}
+        onPointerCancel={finishDrag}
+        onDoubleClick={onDoubleClick}
+      />
       <section className="desktop-questions" aria-label="문항">
         {exam.problem.questions.map((question) => {
           const value = exam.drafts[question.id] ?? exam.saved[question.id] ?? "";
@@ -184,10 +276,10 @@ export function ExamFooter() {
       </p>
       <div className="footer-nav">
         <button type="button" onClick={() => move(-1)} disabled={index <= 0}>
-          이전 문제
+          ‹ 이전 문제
         </button>
         <button type="button" onClick={() => move(1)} disabled={index >= questions.length - 1}>
-          다음 문제
+          다음 문제 ›
         </button>
       </div>
       <div className="footer-end">

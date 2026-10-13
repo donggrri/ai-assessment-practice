@@ -1,37 +1,46 @@
 "use client";
 
 import { useEffect, useRef, useState, type PointerEvent, type ReactNode } from "react";
+import { AI_PANEL_MIN, readAiPanelWidth } from "@/lib/ai-panel-width";
 import {
-  AI_PANEL_DEFAULT,
-  AI_PANEL_MIN,
-  clampAiPanelWidth,
-  maxAiPanelWidth,
-  readAiPanelWidth,
-  writeAiPanelWidth,
-} from "@/lib/ai-panel-width";
+  PROBLEM_PANEL_MIN,
+  PROBLEM_RATIO_DEFAULT,
+  PROBLEM_RATIO_KEY,
+  RAIL_WIDTH,
+  problemRatioFromAiPixels,
+  readPanelRatio,
+  splitByRatio,
+  writePanelRatio,
+} from "@/lib/panel-split";
 
 export function ExamPanes({ children }: { children: ReactNode }) {
   const panesRef = useRef<HTMLDivElement>(null);
-  const preferredRef = useRef(AI_PANEL_DEFAULT);
+  const ratioRef = useRef(PROBLEM_RATIO_DEFAULT);
   const draggingRef = useRef(false);
-  const [preferred, setPreferred] = useState(AI_PANEL_DEFAULT);
-  const [viewport, setViewport] = useState(1280);
+  const [ratio, setRatio] = useState(PROBLEM_RATIO_DEFAULT);
+  const [panesWidth, setPanesWidth] = useState(1280);
   const [desktop, setDesktop] = useState(false);
   const [dragging, setDragging] = useState(false);
-  const width = clampAiPanelWidth(preferred, viewport);
+  const available = Math.max(0, panesWidth - RAIL_WIDTH);
+  const split = splitByRatio(available, ratio, PROBLEM_PANEL_MIN, AI_PANEL_MIN, PROBLEM_RATIO_DEFAULT);
 
   useEffect(() => {
     const media = window.matchMedia("(min-width: 1024px)");
-    const stored = readAiPanelWidth(window.localStorage);
+    const storedRatio = readPanelRatio(window.localStorage, PROBLEM_RATIO_KEY);
+    const storedAi = readAiPanelWidth(window.localStorage);
+    const measure = () => panesRef.current?.clientWidth ?? window.innerWidth;
     const applyViewport = () => {
       setDesktop(media.matches);
-      setViewport(window.innerWidth);
+      setPanesWidth(measure());
     };
     const hydrate = () => {
-      if (stored != null) {
-        preferredRef.current = stored;
-        setPreferred(stored);
-      }
+      const width = measure();
+      const flexible = Math.max(0, width - RAIL_WIDTH);
+      const next =
+        storedRatio ??
+        (storedAi == null ? PROBLEM_RATIO_DEFAULT : problemRatioFromAiPixels(storedAi, flexible, window.innerWidth));
+      ratioRef.current = next;
+      setRatio(next);
       applyViewport();
     };
     hydrate();
@@ -45,8 +54,8 @@ export function ExamPanes({ children }: { children: ReactNode }) {
   }, []);
 
   function remember(next: number) {
-    preferredRef.current = next;
-    setPreferred(next);
+    ratioRef.current = next;
+    setRatio(next);
   }
 
   function onPointerDown(event: PointerEvent<HTMLDivElement>) {
@@ -59,8 +68,10 @@ export function ExamPanes({ children }: { children: ReactNode }) {
 
   function onPointerMove(event: PointerEvent<HTMLDivElement>) {
     if (!draggingRef.current || !panesRef.current) return;
-    const right = panesRef.current.getBoundingClientRect().right;
-    remember(clampAiPanelWidth(right - event.clientX, window.innerWidth));
+    const rect = panesRef.current.getBoundingClientRect();
+    const flexible = Math.max(1, rect.width - RAIL_WIDTH);
+    const problem = event.clientX - rect.left - RAIL_WIDTH;
+    remember(problem / flexible);
   }
 
   function finishDrag() {
@@ -68,31 +79,31 @@ export function ExamPanes({ children }: { children: ReactNode }) {
     draggingRef.current = false;
     setDragging(false);
     document.body.classList.remove("ai-panel-dragging");
-    writeAiPanelWidth(window.localStorage, preferredRef.current);
+    writePanelRatio(window.localStorage, PROBLEM_RATIO_KEY, ratioRef.current);
   }
 
   function onDoubleClick() {
-    remember(AI_PANEL_DEFAULT);
-    writeAiPanelWidth(window.localStorage, AI_PANEL_DEFAULT);
+    remember(PROBLEM_RATIO_DEFAULT);
+    writePanelRatio(window.localStorage, PROBLEM_RATIO_KEY, PROBLEM_RATIO_DEFAULT);
   }
 
   return (
     <div
       ref={panesRef}
       className={`panes${dragging ? " dragging" : ""}`}
-      style={desktop ? { gridTemplateColumns: `76px minmax(0, 1fr) ${width}px` } : undefined}
+      style={desktop ? { gridTemplateColumns: `${RAIL_WIDTH}px ${split.primary}px ${split.secondary}px` } : undefined}
     >
       {children}
       <div
         className="ai-resizer"
         role="separator"
         aria-orientation="vertical"
-        aria-label="AI 패널 폭 조절"
-        aria-valuemin={Math.min(AI_PANEL_MIN, maxAiPanelWidth(viewport))}
-        aria-valuemax={maxAiPanelWidth(viewport)}
-        aria-valuenow={width}
+        aria-label="문제 패널과 AI 패널 사이 폭 조절"
+        aria-valuemin={PROBLEM_PANEL_MIN}
+        aria-valuemax={Math.max(PROBLEM_PANEL_MIN, available - AI_PANEL_MIN)}
+        aria-valuenow={split.primary}
         data-testid="ai-resizer"
-        style={desktop ? { left: `calc(100% - ${width}px)` } : undefined}
+        style={desktop ? { left: `calc(100% - ${split.secondary}px)` } : undefined}
         onPointerDown={onPointerDown}
         onPointerMove={onPointerMove}
         onPointerUp={finishDrag}
