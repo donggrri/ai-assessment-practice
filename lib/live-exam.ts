@@ -81,6 +81,8 @@ export type LiveSession = {
   attachedFileIds: string[];
   chatQuestionId: string | null;
   messages: ChatMessage[];
+  /** 실전 모드에서 문제 세트별 대화. 없으면 messages를 현재 문항 세트의 기록으로 본다. */
+  threads?: Record<string, ChatMessage[]>;
   requestsUsed: number;
   report: GradeReport | null;
   view: "exam" | "result";

@@ -446,12 +446,13 @@ describe("createExamEngine", () => {
     assert.match(first.userContent, /FILE_B_BODY/);
     assert.match(first.reply, /이전 대화 0턴/);
     assert.equal(first.messages[0].role, "system");
-    assert.match(String(first.messages[0].content), /이번 대화에서 지금까지 주고받은 메시지/);
+    assert.match(String(first.messages[0].content), /이전 대화\(질문·답변\)와 이번 첨부를 근거로/);
+    assert.equal(String(first.messages[0].content).includes("이전 턴의 첨부 파일"), false);
     assert.equal(String(first.messages[0].content).includes("이전 대화 없음"), false);
 
     const second = await mockEngine.send(
       turn(["c"], "합쳐", 1, [
-        { role: "user", content: first.userContent },
+        { role: "user", content: "첫번째" },
         { role: "assistant", content: first.reply },
       ]),
     );
@@ -459,15 +460,16 @@ describe("createExamEngine", () => {
     if (!second.ok) return;
     assert.equal(second.messages.length, 4);
     assert.equal(second.messages[1].role, "user");
-    assert.match(String(second.messages[1].content), /FILE_A_BODY/);
-    assert.match(String(second.messages[1].content), /FILE_B_BODY/);
+    assert.equal(second.messages[1].content, "첫번째");
+    assert.equal(String(second.messages[1].content).includes("FILE_A_BODY"), false);
     assert.equal(second.messages[2].role, "assistant");
     assert.equal(second.messages[2].content, first.reply);
     assert.match(String(second.messages[3].content), /FILE_C_BODY/);
+    assert.equal(String(second.messages[3].content).includes("FILE_A_BODY"), false);
     assert.match(second.reply, /이전 대화 2턴/);
     const mockBlob = second.messages.map((message) => String(message.content)).join("\n");
-    assert.match(mockBlob, /FILE_A_BODY/);
-    assert.match(mockBlob, /FILE_B_BODY/);
+    assert.equal(mockBlob.includes("FILE_A_BODY"), false);
+    assert.equal(mockBlob.includes("FILE_B_BODY"), false);
     assert.match(mockBlob, /FILE_C_BODY/);
 
     const payloads: { messages: { role: string; content: string }[] }[] = [];
@@ -493,7 +495,7 @@ describe("createExamEngine", () => {
     assert.match(liveFirst.userContent, /FILE_A_BODY/);
     const liveSecond = await liveEngine.send(
       turn(["c"], "합쳐", 1, [
-        { role: "user", content: liveFirst.userContent },
+        { role: "user", content: "첫번째" },
         { role: "assistant", content: liveFirst.reply },
       ]),
     );
@@ -502,13 +504,14 @@ describe("createExamEngine", () => {
     assert.equal(payloads.length, 2);
     const sent = payloads[1].messages;
     assert.equal(sent.length, 4);
-    assert.match(sent[0].content, /이번 대화에서 지금까지 주고받은 메시지\(이전 턴의 첨부 파일과 네가 만든 표 포함\)/);
-    assert.equal(sent[0].content.includes("첨부되지 않은 자료는 없다고"), false);
+    assert.match(sent[0].content, /이전 대화\(질문·답변\)와 이번 첨부를 근거로/);
+    assert.equal(sent[0].content.includes("이전 턴의 첨부 파일"), false);
     assert.equal(sent[1].role, "user");
-    assert.match(sent[1].content, /FILE_A_BODY/);
-    assert.match(sent[1].content, /FILE_B_BODY/);
+    assert.equal(sent[1].content, "첫번째");
+    assert.equal(sent[1].content.includes("FILE_A_BODY"), false);
     assert.deepEqual(sent[2], { role: "assistant", content: "답1" });
     assert.match(sent[3].content, /FILE_C_BODY/);
+    assert.equal(sent[3].content.includes("FILE_A_BODY"), false);
     assert.equal(liveSecond.messages[2].content, "답1");
 
     const hugeHistory = "H".repeat(5000);
@@ -563,7 +566,7 @@ describe("createExamEngine", () => {
       message: "읽어줘",
       requestsUsed: 0,
       history: [
-        { role: "user", content: "PREV_FILE_BODY" },
+        { role: "user", content: "이전 질문" },
         { role: "assistant", content: "이전표" },
       ],
     });
@@ -573,13 +576,15 @@ describe("createExamEngine", () => {
     assert.match(result.userContent, /ALT_TEXT/);
     assert.match(result.userContent, /PDF_EXTRACT/);
     for (const messages of bodies) {
-      assert.deepEqual(messages[1], { role: "user", content: "PREV_FILE_BODY" });
+      assert.deepEqual(messages[1], { role: "user", content: "이전 질문" });
       assert.deepEqual(messages[2], { role: "assistant", content: "이전표" });
+      assert.equal(JSON.stringify(messages[1]).includes("ALT_TEXT"), false);
     }
     assert.equal(Array.isArray(bodies[0][3].content), true);
     assert.match(String(bodies[1][3].content), /ALT_TEXT/);
     assert.match(String(bodies[1][3].content), /PDF_EXTRACT/);
-    assert.equal(result.messages[1].content, "PREV_FILE_BODY");
+    assert.equal(result.messages[1].content, "이전 질문");
+    assert.equal(String(result.messages[1].content).includes("ALT_TEXT"), false);
     assert.match(String(result.messages[3].content), /ALT_TEXT/);
   });
 

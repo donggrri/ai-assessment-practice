@@ -94,4 +94,20 @@ describe("decideChat", () => {
     assert.equal(decision.remaining, 0);
     assert.match(decision.message, /모두 사용/);
   });
+
+  it("횟수 제한을 끄면 한도를 넘어도 질문을 막지 않는다", () => {
+    const decision = decideChat({
+      problemSet: set,
+      questionId: null,
+      fileIds: [],
+      message: "한 번 더",
+      requestsUsed: 10,
+      contextCharLimit: 20_000,
+      aiRequestLimit: 10,
+      enforceRequestLimit: false,
+    });
+    assert.equal(decision.ok, true);
+    if (!decision.ok) return;
+    assert.equal(decision.nextUsed, 11);
+  });
 });

@@ -34,6 +34,8 @@ export function decideChat(input: {
   requestsUsed: number;
   contextCharLimit: number;
   aiRequestLimit: number;
+  /** 끄면 횟수를 세되 막지 않는다. 기본은 막는다. */
+  enforceRequestLimit?: boolean;
 }): ChatDecision {
   if (!input.problemSet) {
     return {
@@ -92,7 +94,14 @@ export function decideChat(input: {
     };
   }
 
-  const ticket = consumeRequest(input.requestsUsed, input.aiRequestLimit);
+  const ticket =
+    input.enforceRequestLimit === false
+      ? {
+          ok: true as const,
+          used: input.requestsUsed + 1,
+          remaining: Math.max(0, input.aiRequestLimit - (input.requestsUsed + 1)),
+        }
+      : consumeRequest(input.requestsUsed, input.aiRequestLimit);
   if (!ticket.ok) {
     return {
       ok: false,

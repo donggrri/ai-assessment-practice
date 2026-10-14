@@ -86,7 +86,7 @@ export type ChatMessage = {
   id: string;
   role: ChatRole;
   content: string;
-  /** 모델에 보낸 본문. 첨부 파일 텍스트가 들어 있으며 다음 질문의 user 메시지로 다시 실린다. */
+  /** 예전 저장본에 첨부 본문이 있어도 다음 요청에는 실리지 않는다. */
   modelContent?: string;
   createdAt: string;
   meta?: {

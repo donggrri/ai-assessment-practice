@@ -21,6 +21,7 @@ type SendInput = {
   message: string;
   requestsUsed: number;
   history?: readonly ModelTurn[];
+  enforceRequestLimit?: boolean;
 };
 
 type SendSuccess = {
@@ -100,6 +101,7 @@ export function createExamEngine(options: {
         requestsUsed: input.requestsUsed,
         contextCharLimit: config.contextCharLimit,
         aiRequestLimit: config.aiRequestLimit,
+        enforceRequestLimit: input.enforceRequestLimit,
       });
 
       if (!decision.ok) {

@@ -42,7 +42,7 @@ describe("completeChat", () => {
     assert.equal(body.messages[0].content, chatSystemPrompt);
     assert.match(
       body.messages[0].content,
-      /이번 대화에서 지금까지 주고받은 메시지\(이전 턴의 첨부 파일과 네가 만든 표 포함\)를 근거로 답한다\. 대화 어디에도 없는 자료는 추측하지 않고 확인 불가로 적는다\./,
+      /이전 대화\(질문·답변\)와 이번 첨부를 근거로 답한다\. 이전 첨부 파일 본문은 볼 수 없으니, 필요하면 다시 첨부를 요청한다\./,
     );
     assert.equal(body.messages[0].content.includes("사용자 메시지에 들어 있는"), false);
     assert.equal(body.messages[0].content.includes("첨부되지 않은 자료는 없다고"), false);

@@ -1,7 +1,7 @@
 "use client";
 
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
-import { chatSystemPrompt, historyFromChat, threadUsage } from "@/lib/chat-thread";
+import { chatSystemPrompt, groupThreadId, historyFromChat, rememberedTurnCount, threadUsage, trimChatMessages } from "@/lib/chat-thread";
 import { measureContext } from "@/lib/context";
 import { createExamEngine } from "@/lib/exam-engine";
 import {
@@ -37,6 +37,7 @@ import {
   type AiGuardState,
 } from "@/lib/ai-constraints";
 import { remainingRequests } from "@/lib/requests";
+import { loadRequestLimitEnabled, saveRequestLimitEnabled } from "@/lib/request-limit";
 import { toPublicProblemSet, toSummary } from "@/lib/public-problem";
 import { attemptStarted, describeProgress, pickBestScore, type ProgressView } from "@/lib/set-progress";
 import type {
@@ -139,7 +140,7 @@ export function ExamApp({ sets: serverSets, buildConfig }: ExamAppProps) {
   const [viewerFileId, setViewerFileId] = useState<string | null>(null);
   const [attachedFileIds, setAttachedFileIds] = useState<string[]>([]);
   const [chatQuestionId, setChatQuestionId] = useState<string | null>(null);
-  const [messages, setMessages] = useState<ChatMessage[]>([]);
+  const [threads, setThreads] = useState<Record<string, ChatMessage[]>>({});
   const [requestsUsed, setRequestsUsed] = useState(0);
   const [report, setReport] = useState<GradeReport | null>(null);
   const [reviewIds, setReviewIds] = useState<string[]>([]);
@@ -155,6 +156,7 @@ export function ExamApp({ sets: serverSets, buildConfig }: ExamAppProps) {
   const [sending, setSending] = useState(false);
   const [chatError, setChatError] = useState<string | null>(null);
   const [strictConstraints, setStrictConstraintsState] = useState(true);
+  const [requestLimitEnabled, setRequestLimitEnabledState] = useState(false);
   const [guard, setGuard] = useState<AiGuardState>(emptyAiGuard);
   const [cooldownNow, setCooldownNow] = useState(0);
   const [mobilePane, setMobilePane] = useState<MobilePane>("work");
@@ -225,17 +227,17 @@ export function ExamApp({ sets: serverSets, buildConfig }: ExamAppProps) {
         setSetId(id);
         setSaved(stored?.saved ?? {});
         setDrafts(stored?.drafts ?? {});
-        setActiveQuestionId(
-          stored?.activeQuestionId && questionIds.has(stored.activeQuestionId)
-            ? stored.activeQuestionId
-            : data.questions[0].id,
-        );
         setViewerFileId(stored?.viewerFileId && fileIds.has(stored.viewerFileId) ? stored.viewerFileId : null);
         setAttachedFileIds((stored?.attachedFileIds ?? []).filter((fileId) => fileIds.has(fileId)));
+        const activeId =
+          stored?.activeQuestionId && questionIds.has(stored.activeQuestionId)
+            ? stored.activeQuestionId
+            : data.questions[0].id;
+        setActiveQuestionId(activeId);
         setChatQuestionId(
-          stored?.chatQuestionId && questionIds.has(stored.chatQuestionId) ? stored.chatQuestionId : null,
+          stored?.chatQuestionId && questionIds.has(stored.chatQuestionId) ? stored.chatQuestionId : activeId,
         );
-        setMessages(Array.isArray(stored?.messages) ? stored.messages : []);
+        setThreads({ [id]: trimChatMessages(Array.isArray(stored?.messages) ? stored.messages : []) });
         setRequestsUsed(typeof stored?.requestsUsed === "number" ? stored.requestsUsed : 0);
         setReport(stored?.report ?? null);
         setReviewIds(Array.isArray(stored?.reviewIds) ? stored.reviewIds : []);
@@ -312,8 +314,20 @@ export function ExamApp({ sets: serverSets, buildConfig }: ExamAppProps) {
         stored?.viewerFileId && fileIds.has(stored.viewerFileId) ? stored.viewerFileId : (pub.files[0]?.id ?? null),
       );
       setAttachedFileIds((stored?.attachedFileIds ?? []).filter((fileId) => fileIds.has(fileId)));
-      setChatQuestionId(stored?.chatQuestionId && questionIds.has(stored.chatQuestionId) ? stored.chatQuestionId : null);
-      setMessages(Array.isArray(stored?.messages) ? stored.messages : []);
+      setChatQuestionId(stored?.chatQuestionId && questionIds.has(stored.chatQuestionId) ? stored.chatQuestionId : active);
+      const storedThreads = stored?.threads;
+      if (storedThreads && Object.keys(storedThreads).length > 0) {
+        const nextThreads: Record<string, ChatMessage[]> = {};
+        for (const [key, list] of Object.entries(storedThreads)) {
+          nextThreads[key] = trimChatMessages(Array.isArray(list) ? list : []);
+        }
+        setThreads(nextThreads);
+      } else if (stored && stored.messages.length > 0) {
+        const legacyGroup = groupThreadId("live", "live", stored.chatQuestionId ?? active);
+        setThreads(legacyGroup ? { [legacyGroup]: trimChatMessages(stored.messages) } : {});
+      } else {
+        setThreads({});
+      }
       setRequestsUsed(typeof stored?.requestsUsed === "number" ? stored.requestsUsed : 0);
       setReport(stored?.report ?? null);
       setReviewIds(Array.isArray(stored?.reviewIds) ? stored.reviewIds : []);
@@ -341,6 +355,7 @@ export function ExamApp({ sets: serverSets, buildConfig }: ExamAppProps) {
 
       const settings = loadLlmSettings();
       setStrictConstraintsState(loadStrictConstraints(localStorage));
+      setRequestLimitEnabledState(loadRequestLimitEnabled(localStorage));
       const bootSummaries = serverSets.map(toSummary);
 
       if (cancel) return;
@@ -417,6 +432,22 @@ export function ExamApp({ sets: serverSets, buildConfig }: ExamAppProps) {
     return next;
   }, [screen, summaries]);
 
+  const chatGroupId = groupThreadId(
+    setId === "live" ? "live" : "set",
+    setId ?? "",
+    setId === "live" ? (chatQuestionId ?? activeQuestionId) : activeQuestionId,
+  );
+  const messages = threads[chatGroupId] ?? [];
+
+  function writeGroup(groupId: string, next: ChatMessage[] | ((current: ChatMessage[]) => ChatMessage[])) {
+    if (!groupId) return;
+    setThreads((prev) => {
+      const current = prev[groupId] ?? [];
+      const value = typeof next === "function" ? next(current) : next;
+      return { ...prev, [groupId]: trimChatMessages(value) };
+    });
+  }
+
   useEffect(() => {
     if (!hydrated || !setId) return;
     if (setId === "live") {
@@ -432,7 +463,8 @@ export function ExamApp({ sets: serverSets, buildConfig }: ExamAppProps) {
           viewerFileId,
           attachedFileIds,
           chatQuestionId,
-          messages,
+          messages: threads[chatGroupId] ?? [],
+          threads,
           requestsUsed,
           report,
           view,
@@ -450,7 +482,7 @@ export function ExamApp({ sets: serverSets, buildConfig }: ExamAppProps) {
       viewerFileId,
       attachedFileIds,
       chatQuestionId,
-      messages,
+      messages: threads[setId] ?? [],
       requestsUsed,
       report,
       view,
@@ -466,7 +498,8 @@ export function ExamApp({ sets: serverSets, buildConfig }: ExamAppProps) {
     viewerFileId,
     attachedFileIds,
     chatQuestionId,
-    messages,
+    chatGroupId,
+    threads,
     requestsUsed,
     report,
     view,
@@ -533,6 +566,7 @@ export function ExamApp({ sets: serverSets, buildConfig }: ExamAppProps) {
 
   function selectQuestion(id: string) {
     setActiveQuestionId(id);
+    setChatQuestionId(id);
     setMobilePane("work");
     if (setId !== "live" || !serverSets) return;
     const ref = parseLiveQuestionKey(id);
@@ -596,15 +630,21 @@ export function ExamApp({ sets: serverSets, buildConfig }: ExamAppProps) {
     saveStrictConstraints(localStorage, enabled);
   }
 
+  function setRequestLimitEnabled(enabled: boolean) {
+    setRequestLimitEnabledState(enabled);
+    saveRequestLimitEnabled(localStorage, enabled);
+  }
+
   function clearChat() {
     if (sending) return;
-    setMessages([]);
+    writeGroup(chatGroupId, []);
     setChatError(null);
   }
 
   async function sendChat() {
     if (!problem || !config || !engine || !setId || locked || sending) return;
-    if (chatDraft.trim() === "" || measurement.over || remaining === 0) return;
+    if (chatDraft.trim() === "" || measurement.over) return;
+    if (requestLimitEnabled && remaining === 0) return;
     if (strictConstraints && guard.cooldownUntil > Date.now()) return;
     const sent = chatDraft;
     const cooling = strictConstraints;
@@ -624,6 +664,7 @@ export function ExamApp({ sets: serverSets, buildConfig }: ExamAppProps) {
         message: chatDraft,
         requestsUsed,
         history: historyFromChat(messages),
+        enforceRequestLimit: requestLimitEnabled,
       });
       if (!data.ok) {
         if (cooling) rememberGuard({ v: 1, lastMessage: guard.lastMessage, cooldownUntil: 0 });
@@ -635,7 +676,6 @@ export function ExamApp({ sets: serverSets, buildConfig }: ExamAppProps) {
         id: crypto.randomUUID(),
         role: "user",
         content: chatDraft,
-        modelContent: data.userContent,
         createdAt: new Date().toISOString(),
         meta: {
           questionNumber: data.questionNumber ?? null,
@@ -655,7 +695,7 @@ export function ExamApp({ sets: serverSets, buildConfig }: ExamAppProps) {
           mock: data.mock,
         },
       };
-      setMessages((prev) => [...prev, userMessage, assistant]);
+      writeGroup(chatGroupId, (prev) => [...prev, userMessage, assistant]);
       setRequestsUsed(data.requestsUsed);
       setChatDraft("");
       if (cooling) rememberGuard({ v: 1, lastMessage: sent, cooldownUntil: until });
@@ -741,10 +781,11 @@ export function ExamApp({ sets: serverSets, buildConfig }: ExamAppProps) {
       setSetLeft(remainingLiveMs(startedAt, startedAt, minutes * 60_000));
     }
     setActiveQuestionId(problem.questions[0].id);
+    setChatQuestionId(problem.questions[0].id);
     if (setId === "live") {
-      setMessages([]);
-    } else {
-      setMessages((prev) => [
+      setThreads({});
+    } else if (setId) {
+      writeGroup(setId, (prev) => [
         ...prev,
         {
           id: crypto.randomUUID(),
@@ -892,6 +933,8 @@ export function ExamApp({ sets: serverSets, buildConfig }: ExamAppProps) {
     attachedFileIds,
     chatQuestionId,
     messages,
+    chatGroupId,
+    memoryTurns: rememberedTurnCount(messages),
     threadChars: thread.chars,
     threadTokens: thread.tokens,
     requestsUsed,
@@ -927,6 +970,8 @@ export function ExamApp({ sets: serverSets, buildConfig }: ExamAppProps) {
     clearChat,
     strictConstraints,
     setStrictConstraints,
+    requestLimitEnabled,
+    setRequestLimitEnabled,
     cooldownLeftMs,
     similarWarning,
     blocksMaterialPaste: (text: string) =>
@@ -968,9 +1013,12 @@ export function ExamApp({ sets: serverSets, buildConfig }: ExamAppProps) {
               문제 목록
             </button>
             {config.mockMode ? <span className="pill mock">모의 응답</span> : <span className="pill">{config.model}</span>}
-            <span className={`pill ${remaining === 0 ? "warn" : ""}`} data-testid="remaining-requests">
-              남은 AI 질문 {remaining}회
-            </span>
+            <RequestLimitToggle enabled={requestLimitEnabled} onChange={setRequestLimitEnabled} />
+            {requestLimitEnabled ? (
+              <span className={`pill ${remaining === 0 ? "warn" : ""}`} data-testid="remaining-requests">
+                남은 AI 질문 {remaining}회
+              </span>
+            ) : null}
             {clockLabel ? (
               <span className="pill live-timer" data-testid={`${clockTestId}-mobile`}>
                 {clockLabel}
@@ -1018,6 +1066,12 @@ export function ExamApp({ sets: serverSets, buildConfig }: ExamAppProps) {
                 {clockLabel ? (
                   <span className="live-timer" data-testid={clockTestId}>
                     {clockLabel}
+                  </span>
+                ) : null}
+                <RequestLimitToggle enabled={requestLimitEnabled} onChange={setRequestLimitEnabled} />
+                {requestLimitEnabled ? (
+                  <span className={`pill ${remaining === 0 ? "warn" : ""}`} data-testid="remaining-requests">
+                    남은 AI 질문 {remaining}회
                   </span>
                 ) : null}
                 <button type="button" className="btn ghost small" onClick={showCatalog}>
@@ -1193,5 +1247,19 @@ export function ExamApp({ sets: serverSets, buildConfig }: ExamAppProps) {
         }}
       />
     </ExamProvider>
+  );
+}
+
+function RequestLimitToggle({ enabled, onChange }: { enabled: boolean; onChange: (enabled: boolean) => void }) {
+  return (
+    <label className="limit-toggle">
+      <input
+        type="checkbox"
+        data-testid="request-limit"
+        checked={enabled}
+        onChange={(event) => onChange(event.target.checked)}
+      />
+      횟수 제한
+    </label>
   );
 }

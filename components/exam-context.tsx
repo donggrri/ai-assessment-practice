@@ -23,6 +23,8 @@ export type ExamApi = {
   attachedFileIds: string[];
   chatQuestionId: string | null;
   messages: ChatMessage[];
+  chatGroupId: string;
+  memoryTurns: number;
   threadChars: number;
   threadTokens: number;
   requestsUsed: number;
@@ -55,6 +57,8 @@ export type ExamApi = {
   clearChat: () => void;
   strictConstraints: boolean;
   setStrictConstraints: (enabled: boolean) => void;
+  requestLimitEnabled: boolean;
+  setRequestLimitEnabled: (enabled: boolean) => void;
   cooldownLeftMs: number;
   similarWarning: string | null;
   blocksMaterialPaste: (text: string) => boolean;
