@@ -4,10 +4,18 @@ export function memoStorageKey(groupId: string): string {
 
 export function loadMemo(storage: Pick<Storage, "getItem">, groupId: string): string {
   if (!groupId) return "";
-  return storage.getItem(memoStorageKey(groupId)) ?? "";
+  try {
+    return storage.getItem(memoStorageKey(groupId)) ?? "";
+  } catch {
+    return "";
+  }
 }
 
 export function saveMemo(storage: Pick<Storage, "setItem">, groupId: string, text: string): void {
   if (!groupId) return;
-  storage.setItem(memoStorageKey(groupId), text);
+  try {
+    storage.setItem(memoStorageKey(groupId), text);
+  } catch {
+    // 저장 공간이 없거나 막혀 있어도 화면은 멈추지 않는다.
+  }
 }

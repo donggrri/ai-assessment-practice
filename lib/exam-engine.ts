@@ -126,7 +126,7 @@ export function createExamEngine(options: {
               omittedFileNames: decision.omittedFileNames,
               message: decision.message,
               totalChars: decision.charCount,
-              priorTurns: history.length,
+              priorTurns: history.filter((turn) => turn.role === "user").length,
             })
           : await (async () => {
               const composed = await composeModelContent({

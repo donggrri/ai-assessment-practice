@@ -162,7 +162,7 @@ export function AiPane() {
             data-testid="chat-input"
             value={exam.chatDraft}
             placeholder={placeholder}
-            disabled={exam.locked || limitBlocked || exam.sending}
+            disabled={exam.locked || limitBlocked}
             onChange={(event) => {
               setPasteWarning(false);
               exam.setChatDraft(event.target.value);
@@ -178,7 +178,7 @@ export function AiPane() {
               setPasteWarning(true);
             }}
             onKeyDown={(event) => {
-              if (!enterSends(event.key, event.shiftKey, event.nativeEvent.isComposing)) return;
+              if (!enterSends(event.key, event.shiftKey, event.nativeEvent.isComposing, event.nativeEvent.keyCode)) return;
               event.preventDefault();
               if (!blocked) exam.sendChat();
             }}
@@ -247,7 +247,12 @@ export function AiPane() {
       </div>
       {memoOpen ? (
         <section className="memo-pad" data-testid="memo-pad" aria-label="메모장">
-          <p className="memo-label">메모장</p>
+          <div className="memo-head">
+            <p className="memo-label">메모장</p>
+            <button type="button" className="memo-close" data-testid="memo-close" aria-label="메모장 닫기" onClick={() => setMemoOpen(false)}>
+              ×
+            </button>
+          </div>
           <textarea
             data-testid="memo-input"
             value={memo}

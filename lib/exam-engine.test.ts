@@ -466,7 +466,7 @@ describe("createExamEngine", () => {
     assert.equal(second.messages[2].content, first.reply);
     assert.match(String(second.messages[3].content), /FILE_C_BODY/);
     assert.equal(String(second.messages[3].content).includes("FILE_A_BODY"), false);
-    assert.match(second.reply, /이전 대화 2턴/);
+    assert.match(second.reply, /이전 대화 1턴/);
     const mockBlob = second.messages.map((message) => String(message.content)).join("\n");
     assert.equal(mockBlob.includes("FILE_A_BODY"), false);
     assert.equal(mockBlob.includes("FILE_B_BODY"), false);

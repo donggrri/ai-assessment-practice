@@ -101,3 +101,28 @@ describe("chat thread", () => {
     assert.equal(usage.tokens, 3);
   });
 });
+
+describe("리뷰 반영", () => {
+  it("Safari 한글 조합 종료 Enter(229)는 보내지 않는다", () => {
+    assert.equal(enterSends("Enter", false, false, 229), false);
+    assert.equal(enterSends("Enter", false, false, 13), true);
+  });
+  it("지난 첨부는 파일 이름만 남기고 본문은 싣지 않는다", () => {
+    const turns = historyFromChat([
+      { role: "user", content: "합계?", modelContent: "SECRET_BODY", meta: { fileNames: ["a.csv"] } },
+      { role: "assistant", content: "10" },
+    ]);
+    assert.match(String(turns[0].content), /a\.csv/);
+    assert.equal(JSON.stringify(turns).includes("SECRET_BODY"), false);
+  });
+  it("11번째 질문부터 가장 오래된 질문·답변이 빠진다", () => {
+    const msgs = Array.from({ length: 11 }, (_, i) => [
+      { role: "user", content: `q${i}` },
+      { role: "assistant", content: `a${i}` },
+    ]).flat();
+    const turns = historyFromChat(msgs);
+    assert.equal(turns.length, 20);
+    assert.equal(turns[0].content, "q1");
+    assert.equal(rememberedTurnCount(msgs), 10);
+  });
+});

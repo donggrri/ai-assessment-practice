@@ -697,7 +697,10 @@ export function ExamApp({ sets: serverSets, buildConfig }: ExamAppProps) {
       };
       writeGroup(chatGroupId, (prev) => [...prev, userMessage, assistant]);
       setRequestsUsed(data.requestsUsed);
-      setChatDraft("");
+      // 보내는 동안 새로 입력한 글은 지우지 않는다.
+      setChatDraft((current) => (current === sent ? "" : current));
+      // 첨부는 이번 턴에만 쓰인다. 다음 질문에 필요하면 다시 첨부한다.
+      setAttachedFileIds([]);
       if (cooling) rememberGuard({ v: 1, lastMessage: sent, cooldownUntil: until });
     } catch {
       if (cooling) rememberGuard({ v: 1, lastMessage: guard.lastMessage, cooldownUntil: 0 });

@@ -426,14 +426,22 @@ body.passage-split-dragging, body.passage-split-dragging * { user-select: none !
 }
 .ai-tool-rail button.active { background: var(--tide-soft); color: var(--tide-deep); }
 .memo-pad {
-  flex: 1;
-  min-width: 0;
-  min-height: 0;
+  position: fixed;
+  right: 24px;
+  bottom: 96px;
+  z-index: 60;
+  width: min(340px, calc(100vw - 32px));
+  height: min(260px, calc(100vh - 120px));
   display: flex;
   flex-direction: column;
-  border-left: 1px solid var(--line);
+  border: 1px solid var(--line);
+  border-radius: 10px;
+  box-shadow: 0 12px 32px rgba(0, 0, 0, 0.25);
+  overflow: hidden;
   background: #fff;
 }
+.memo-head { display: flex; align-items: center; justify-content: space-between; padding-right: 6px; }
+.memo-close { border: 0; background: transparent; font-size: 20px; line-height: 1; cursor: pointer; color: inherit; padding: 6px 8px; }
 .memo-label { margin: 0; padding: 10px 10px 0; font-size: 12px; font-weight: 700; color: var(--muted); }
 .memo-pad textarea {
   flex: 1;
@@ -721,6 +729,7 @@ body.passage-split-dragging, body.passage-split-dragging * { user-select: none !
   .section.questions .scroll, .section.files .scroll { max-height: 240px; }
   .section.grow { flex: 1 0 auto; min-height: 140px; }
   .pane-ai.active { overflow: hidden; }
+  .pane-ai .ai-body { overflow-y: auto; }
   .pane-ai .thread { flex: 1 0 auto; min-height: 48vh; }
   .pane-ai .composer { max-height: none; overflow: visible; }
   .viewer { flex: 1 0 auto; min-height: 70vh; }
@@ -1486,7 +1495,7 @@ body.passage-split-dragging, body.passage-split-dragging * { user-select: none !
   .exam-shell.desk-exam .ai-tool-rail { background: #0f1828; border-left-color: #24344c; }
   .exam-shell.desk-exam .ai-tool-rail button { color: #c5d4e8; }
   .exam-shell.desk-exam .ai-tool-rail button.active { background: #24344c; color: #fff; }
-  .exam-shell.desk-exam .memo-pad { background: #0f1828; border-left-color: #24344c; }
+  .exam-shell.desk-exam .memo-pad { background: #0f1828; border-color: #24344c; }
   .exam-shell.desk-exam .memo-label,
   .exam-shell.desk-exam .chat-hint { color: #93a4bb; }
   .exam-shell.desk-exam .memo-pad textarea { background: #0c1422; color: #e7eef8; }

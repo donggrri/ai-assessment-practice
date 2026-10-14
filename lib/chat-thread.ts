@@ -22,10 +22,19 @@ type ThreadMessage = {
   role: string;
   content: string;
   modelContent?: string;
+  meta?: { fileNames?: string[] } | null;
 };
 
-export function enterSends(key: string, shiftKey: boolean, composing: boolean): boolean {
-  return key === "Enter" && !shiftKey && !composing;
+/** 지난 질문에 첨부가 있었다는 사실만 남긴다. 본문은 싣지 않는다. */
+function historyUserText(message: ThreadMessage): string {
+  const names = message.meta?.fileNames ?? [];
+  if (names.length === 0) return message.content;
+  return `[이 질문에 첨부했던 파일: ${names.join(", ")} — 본문은 기억하지 않음]\n${message.content}`;
+}
+
+export function enterSends(key: string, shiftKey: boolean, composing: boolean, keyCode = 0): boolean {
+  // Safari는 한글 조합을 끝내는 Enter를 isComposing=false, keyCode=229로 보낸다.
+  return key === "Enter" && !shiftKey && !composing && keyCode !== 229;
 }
 
 /** 실전 모드에서는 출처 세트, 단독 풀이에서는 그 세트가 대화 그룹이다. */
@@ -66,7 +75,7 @@ export function trimChatMessages<T extends ThreadMessage>(messages: readonly T[]
 export function historyFromChat(messages: readonly ThreadMessage[]): { role: "user" | "assistant"; content: string }[] {
   const turns: { role: "user" | "assistant"; content: string }[] = [];
   for (const message of trimChatMessages(messages)) {
-    if (message.role === "user") turns.push({ role: "user", content: message.content });
+    if (message.role === "user") turns.push({ role: "user", content: historyUserText(message) });
     else if (message.role === "assistant") turns.push({ role: "assistant", content: message.content });
   }
   return turns;
