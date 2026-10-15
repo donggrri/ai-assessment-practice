@@ -1,6 +1,6 @@
 "use client";
 
-import { useCallback, useEffect, useMemo, useRef, useState } from "react";
+import { useCallback, useEffect, useLayoutEffect, useMemo, useRef, useState } from "react";
 import { chatSystemPrompt, groupThreadId, historyFromChat, rememberedTurnCount, threadUsage, trimChatMessages } from "@/lib/chat-thread";
 import { measureContext } from "@/lib/context";
 import { createExamEngine } from "@/lib/exam-engine";
@@ -838,7 +838,7 @@ export function ExamApp({ sets: serverSets, buildConfig }: ExamAppProps) {
   const setLimitMs = (problem?.timeLimitMin ?? 0) * 60_000;
   // 25분 등 세트 제한 시간이 끝나면 그 순간 답으로 한 번만 자동 채점한다. 화면은 잠그지 않는다.
   const autoGradeRef = useRef<() => void>(() => undefined);
-  useEffect(() => {
+  useLayoutEffect(() => {
     autoGradeRef.current = () => {
       if (!hydrated || setId === "live" || !problem || !engine) return;
       if (timeReport != null || report != null) return;
@@ -866,7 +866,7 @@ export function ExamApp({ sets: serverSets, buildConfig }: ExamAppProps) {
       const now = Date.now();
       setSetLeft(remainingLiveMs(setStartedAt, now, setLimitMs));
       setSetOverMs(Math.max(0, now - setStartedAt - setLimitMs));
-      if (now - setStartedAt >= setLimitMs) autoGradeRef.current();
+      if (now - setStartedAt >= setLimitMs && timeReport == null && report == null) autoGradeRef.current();
     }, 250);
     return () => window.clearInterval(timer);
   }, [screen, setId, liveStartedAt, setStartedAt, setLimitMs, report, timeReport]);
@@ -1099,8 +1099,8 @@ export function ExamApp({ sets: serverSets, buildConfig }: ExamAppProps) {
             ) : null}
           </div>
         </header>
-        {view === "result" && report ? (
-          <ResultScreen report={report} timeReport={timeReport} onReview={() => setView("exam")} onNewAttempt={() => setNewAttemptOpen(true)} />
+        {view === "result" && (report ?? timeReport) ? (
+          <ResultScreen report={(report ?? timeReport)!} timeReport={report ? timeReport : null} onReview={() => setView("exam")} onNewAttempt={() => setNewAttemptOpen(true)} />
         ) : (
           <>
             <div className="crumb-bar desktop-exam">

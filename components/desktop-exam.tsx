@@ -19,7 +19,12 @@ import { useExam } from "./exam-context";
 export function QuestionRail() {
   const exam = useExam();
   const shown = exam.report ?? exam.timeReport;
-  const score = shown ? `${shown.score}/100` : "-/100";
+  const score =
+    exam.timeReport && exam.report
+      ? `${exam.timeReport.score}→${exam.report.score}`
+      : shown
+        ? `${shown.score}/100`
+        : "-/100";
   return (
     <nav className="q-rail desktop-exam" aria-label="문항 번호" data-tour="question-list">
       <p className="q-score" data-testid="rail-score">
@@ -312,7 +317,7 @@ export function ExamFooter() {
             시간 내 {exam.timeReport.score}점{exam.report ? ` · 최종 ${exam.report.score}점` : ""}
           </span>
         ) : null}
-        {exam.report ? (
+        {exam.report || exam.timeReport ? (
           <button type="button" className="btn finish" onClick={() => exam.showResult()}>
             채점 결과
           </button>
