@@ -640,6 +640,8 @@ export function ExamApp({ sets: serverSets, buildConfig }: ExamAppProps) {
     if (sending) return;
     writeGroup(chatGroupId, []);
     setChatError(null);
+    // 대화를 비우면 AI 질문 횟수도 처음부터 센다. 저장값은 아래 저장 effect가 덮어쓴다.
+    setRequestsUsed(0);
   }
 
   async function sendChat() {
@@ -783,6 +785,11 @@ export function ExamApp({ sets: serverSets, buildConfig }: ExamAppProps) {
       const startedAt = Date.now();
       setSetStartedAt(startedAt);
       setSetLeft(remainingLiveMs(startedAt, startedAt, minutes * 60_000));
+    }
+    if (setId && setId !== "live") {
+      clearAiGuard(localStorage, setId);
+      setGuard(emptyAiGuard());
+      setCooldownNow(Date.now());
     }
     setActiveQuestionId(problem.questions[0].id);
     setChatQuestionId(problem.questions[0].id);
