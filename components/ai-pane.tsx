@@ -1,6 +1,6 @@
 "use client";
 
-import { useState, useSyncExternalStore } from "react";
+import { useEffect, useRef, useState, useSyncExternalStore } from "react";
 import { CHAT_HINT, CHAT_MEMORY_TURNS, enterSends } from "@/lib/chat-thread";
 import { loadMemo, saveMemo } from "@/lib/memo-pad";
 import { useExam } from "./exam-context";
@@ -12,6 +12,24 @@ export function AiPane() {
   const [memoOpen, setMemoOpen] = useState(false);
   const [menuOpen, setMenuOpen] = useState(false);
   const [pop, setPop] = useState<"question" | "file" | null>(null);
+  const paneRef = useRef<HTMLElement>(null);
+
+  useEffect(() => {
+    if (!menuOpen && !pop) return;
+    const close = (event: Event) => {
+      if (event instanceof KeyboardEvent && event.key !== "Escape") return;
+      const target = event.target as HTMLElement | null;
+      if (event.type === "pointerdown" && target?.closest(".ai-menu-pop, .dropup, [data-testid='ai-menu']")) return;
+      setMenuOpen(false);
+      setPop(null);
+    };
+    document.addEventListener("pointerdown", close);
+    document.addEventListener("keydown", close);
+    return () => {
+      document.removeEventListener("pointerdown", close);
+      document.removeEventListener("keydown", close);
+    };
+  }, [menuOpen, pop]);
   const memo = useSyncExternalStore(
     subscribeMemo,
     () => loadMemo(localStorage, exam.chatGroupId),
@@ -54,7 +72,7 @@ export function AiPane() {
   }
 
   return (
-    <aside className={`pane pane-ai ${exam.mobilePane === "ai" ? "active" : ""}`} data-tour="ai-panel">
+    <aside ref={paneRef} className={`pane pane-ai ${exam.mobilePane === "ai" ? "active" : ""}`} data-tour="ai-panel">
       <div className="ai-body">
         <div className="ai-head">
           <div className="ai-head-row">
@@ -165,6 +183,11 @@ export function AiPane() {
             if (!blocked) exam.sendChat();
           }}
         >
+          {exam.measurement.over ? (
+            <p className="warn" role="alert" data-testid="context-warning">
+              컨텍스트 한도를 초과했습니다. 첨부 파일을 빼거나 질문을 줄인 뒤 다시 보내세요.
+            </p>
+          ) : null}
           {limitBlocked && !exam.locked ? (
             <p className="warn" role="status">
               AI 질문 횟수를 모두 사용했습니다.
@@ -205,7 +228,7 @@ export function AiPane() {
                 <span aria-hidden="true">⌃</span>
               </button>
               {pop === "question" ? (
-                <ul className="dropup-pop" role="listbox" aria-label="문제 선택">
+                <ul className="dropup-pop" aria-label="문제 선택">
                   <li>
                     <button type="button" onClick={() => { exam.setChatQuestionId(null); setPop(null); }}>
                       선택 안 함 (공통 지문만)
@@ -215,7 +238,7 @@ export function AiPane() {
                     <li key={question.id}>
                       <button
                         type="button"
-                        aria-selected={question.id === exam.chatQuestionId}
+                        aria-pressed={question.id === exam.chatQuestionId}
                         className={question.id === exam.chatQuestionId ? "on" : ""}
                         onClick={() => { exam.setChatQuestionId(question.id); setPop(null); }}
                       >
@@ -239,6 +262,7 @@ export function AiPane() {
               </button>
               {pop === "file" ? (
                 <ul className="dropup-pop files" aria-label="첨부 파일 선택">
+                  {exam.problem.files.length === 0 ? <li className="dropup-empty">첨부 가능한 파일이 없습니다.</li> : null}
                   {exam.problem.files.map((file) => {
                     const on = exam.attachedFileIds.includes(file.id);
                     return (
