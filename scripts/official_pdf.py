@@ -257,6 +257,10 @@ class OfficialPdf(FPDF):
                 weights.append(1.7)
             elif key in {"submitted", "제출시각", "접수시각"}:
                 weights.append(1.45)
+            elif key in {"값", "value"}:
+                weights.append(1.9)
+            elif key in {"항목", "통화", "센서", "언어"}:
+                weights.append(0.75)
             elif key == "본문":
                 weights.append(3.4)
             else:
