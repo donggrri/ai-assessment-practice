@@ -24,6 +24,20 @@ export function AiPane() {
     .map((id) => exam.problem.files.find((file) => file.id === id))
     .filter((file): file is NonNullable<typeof file> => Boolean(file));
   const selectedQuestion = exam.problem.questions.find((question) => question.id === exam.chatQuestionId) ?? null;
+  const attachChars = exam.measurement.parts
+    .filter((part) => part.key.startsWith("file:"))
+    .reduce((sum, part) => sum + part.charCount, 0);
+  const sendReason = exam.locked
+    ? "채점이 끝났습니다"
+    : limitBlocked
+      ? "질문 횟수 소진"
+      : exam.measurement.over
+        ? "컨텍스트 한도 초과"
+        : cooling
+          ? `다음 질문까지 ${Math.ceil(exam.cooldownLeftMs / 1000)}초`
+          : exam.sending
+            ? "응답 대기 중"
+            : null;
   const limit = exam.measurement.limit ?? exam.config.contextCharLimit;
   const ratio = limit > 0 ? Math.min(100, (exam.measurement.charCount / limit) * 100) : 100;
   const placeholder = exam.locked
@@ -76,7 +90,7 @@ export function AiPane() {
                   className={`counter ${exam.measurement.over ? "over" : exam.measurement.near ? "near" : ""}`}
                   data-testid="context-counter"
                 >
-                  컨텍스트 {exam.measurement.charCount.toLocaleString("ko-KR")} / {limit.toLocaleString("ko-KR")}자
+                  첨부 파일 {attachChars.toLocaleString("ko-KR")}자 (전체 한도 {limit.toLocaleString("ko-KR")}자)
                 </p>
                 <div className={`bar ${exam.measurement.over ? "over" : exam.measurement.near ? "near" : ""}`}>
                   <span style={{ width: `${ratio}%` }} />
@@ -243,9 +257,12 @@ export function AiPane() {
                 </ul>
               ) : null}
             </div>
-            {cooling ? (
+            <span className="attach-size" data-testid="attach-size">
+              첨부 {attachChars.toLocaleString("ko-KR")}자
+            </span>
+            {sendReason ? (
               <span className="cooldown-tag" role="status" data-testid="ask-cooldown">
-                다음 질문까지 {cooldownSeconds}초
+                {sendReason}
               </span>
             ) : null}
           </div>

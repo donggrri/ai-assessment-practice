@@ -1575,3 +1575,6 @@ body.passage-split-dragging, body.passage-split-dragging * { user-select: none !
 .exam-shell.desk-exam .chat-md hr { border: 0; border-top: 1px solid #33465f; }
 .exam-shell.desk-exam .chat-md th, .exam-shell.desk-exam .chat-md td { border-color: #33465f; }
 .exam-shell.desk-exam .chat-md .table-scroll { border-color: #33465f; }
+.attach-size { margin-left: auto; align-self: center; font-size: 11px; color: var(--muted); white-space: nowrap; }
+.attach-size + .cooldown-tag { margin-left: 8px; }
+.exam-shell.desk-exam .attach-size { color: #93a4bb; }
