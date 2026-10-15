@@ -150,6 +150,8 @@ export function ExamApp({ sets: serverSets, buildConfig }: ExamAppProps) {
   const [liveLeft, setLiveLeft] = useState(0);
   const [setStartedAt, setSetStartedAt] = useState<number | null>(null);
   const [setLeft, setSetLeft] = useState(0);
+  /** 단독 세트 제한 시간을 넘긴 시간. 막지 않고 표시만 한다. */
+  const [setOverMs, setSetOverMs] = useState(0);
   const [sourceTitle, setSourceTitle] = useState("");
   const [hydrated, setHydrated] = useState(false);
   const [chatDraft, setChatDraft] = useState("");
@@ -250,9 +252,11 @@ export function ExamApp({ sets: serverSets, buildConfig }: ExamAppProps) {
           const started = typeof stored?.startedAt === "number" ? stored.startedAt : Date.now();
           setSetStartedAt(started);
           setSetLeft(remainingLiveMs(started, Date.now(), limitMin * 60_000));
+          setSetOverMs(Math.max(0, Date.now() - started - limitMin * 60_000));
         } else {
           setSetStartedAt(null);
           setSetLeft(0);
+          setSetOverMs(0);
         }
         sourceSetIdRef.current = null;
         setSourceTitle(full.title);
@@ -785,6 +789,7 @@ export function ExamApp({ sets: serverSets, buildConfig }: ExamAppProps) {
       const startedAt = Date.now();
       setSetStartedAt(startedAt);
       setSetLeft(remainingLiveMs(startedAt, startedAt, minutes * 60_000));
+      setSetOverMs(0);
     }
     if (setId && setId !== "live") {
       clearAiGuard(localStorage, setId);
@@ -837,9 +842,10 @@ export function ExamApp({ sets: serverSets, buildConfig }: ExamAppProps) {
     }
     if (setStartedAt == null || setLimitMs <= 0) return;
     const timer = window.setInterval(() => {
-      const left = remainingLiveMs(setStartedAt, Date.now(), setLimitMs);
-      setSetLeft(left);
-      if (left === 0) confirmGradeRef.current();
+      // 연습용: 시간이 끝나도 자동 채점하거나 막지 않고, 넘긴 시간만 센다.
+      const now = Date.now();
+      setSetLeft(remainingLiveMs(setStartedAt, now, setLimitMs));
+      setSetOverMs(Math.max(0, now - setStartedAt - setLimitMs));
     }, 250);
     return () => window.clearInterval(timer);
   }, [screen, setId, liveStartedAt, setStartedAt, setLimitMs, report]);
@@ -1010,8 +1016,11 @@ export function ExamApp({ sets: serverSets, buildConfig }: ExamAppProps) {
       : setId === "live"
         ? formatTimer(liveLeft)
         : setStartedAt != null && setLimitMs > 0
-          ? formatTimer(setLeft)
+          ? setOverMs > 0
+            ? `시간 초과 +${formatTimer(setOverMs)}`
+            : formatTimer(setLeft)
           : null;
+  const clockOver = report == null && setId !== "live" && setStartedAt != null && setLimitMs > 0 && setOverMs > 0;
   const clockTestId = setId === "live" ? "live-timer" : "set-timer";
 
   return (
@@ -1038,7 +1047,7 @@ export function ExamApp({ sets: serverSets, buildConfig }: ExamAppProps) {
               </span>
             ) : null}
             {clockLabel ? (
-              <span className="pill live-timer" data-testid={`${clockTestId}-mobile`}>
+              <span className={`pill live-timer${clockOver ? " overtime" : ""}`} data-testid={`${clockTestId}-mobile`}>
                 {clockLabel}
               </span>
             ) : null}
@@ -1082,7 +1091,7 @@ export function ExamApp({ sets: serverSets, buildConfig }: ExamAppProps) {
               </p>
               <div className="crumb-actions">
                 {clockLabel ? (
-                  <span className="live-timer" data-testid={clockTestId}>
+                  <span className={`live-timer${clockOver ? " overtime" : ""}`} data-testid={clockTestId}>
                     {clockLabel}
                   </span>
                 ) : null}

@@ -1583,3 +1583,4 @@ body.passage-split-dragging, body.passage-split-dragging * { user-select: none !
 .dropup-row .dropup { position: static; }
 .dropup-row .dropup-pop { left: 0; right: 0; min-width: 0; max-width: none; }
 .ai-left-badge.empty { background: rgba(239,68,68,.12); border-color: rgba(239,68,68,.4); }
+.live-timer.overtime, .exam-shell .live-timer.overtime { color: #fff !important; background: #dc2626 !important; border-color: #b91c1c !important; }
