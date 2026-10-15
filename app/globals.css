@@ -1565,3 +1565,13 @@ body.passage-split-dragging, body.passage-split-dragging * { user-select: none !
 .pane-ai .composer .warn { padding: 3px 8px; }
 .pane-ai .ai-head .ai-sub { margin-top: 0; }
 .cooldown-tag { margin-left: auto; align-self: center; font-size: 11px; color: #f59e0b; white-space: nowrap; }
+/* 다크 테마 답변 마크다운 대비 (배경 #1a2740 기준 4.5:1 이상) */
+.exam-shell.desk-exam .chat-md code { background: rgba(148, 163, 184, 0.18); color: #f1f5f9; border: 1px solid rgba(148, 163, 184, 0.28); text-decoration: none; }
+.exam-shell.desk-exam .chat-md pre { background: #0c1422; color: #e7eef8; border: 1px solid #2c3e58; }
+.exam-shell.desk-exam .chat-md pre code { background: transparent; border: 0; color: inherit; }
+.exam-shell.desk-exam .chat-md strong { color: #ffffff; }
+.exam-shell.desk-exam .chat-md a { color: #93c5fd; }
+.exam-shell.desk-exam .chat-md blockquote { color: #c5d4e8; border-left: 3px solid #3b4f6b; margin: 0.5em 0; padding-left: 10px; }
+.exam-shell.desk-exam .chat-md hr { border: 0; border-top: 1px solid #33465f; }
+.exam-shell.desk-exam .chat-md th, .exam-shell.desk-exam .chat-md td { border-color: #33465f; }
+.exam-shell.desk-exam .chat-md .table-scroll { border-color: #33465f; }
