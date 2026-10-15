@@ -43,6 +43,9 @@ export function AiPane() {
           <div className="ai-head-row">
             <h2>AI 어시스트</h2>
             <div className="ai-head-actions">
+              <button type="button" className="btn small ai-close" data-testid="ai-close" aria-label="AI 어시스트 닫기" onClick={() => exam.closeAi()}>
+                닫기
+              </button>
               {limitBlocked ? (
                 <span className="exhausted" data-testid="requests-exhausted">
                   횟수 소진

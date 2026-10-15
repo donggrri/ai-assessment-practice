@@ -154,6 +154,15 @@ export function DesktopCenter() {
         >
           ›
         </button>
+        <button
+          type="button"
+          className="btn small ai-open-btn"
+          data-testid="ai-open"
+          aria-pressed={exam.aiOpen}
+          onClick={() => exam.openAi()}
+        >
+          AI 어시스트
+        </button>
       </div>
       <section
         className="desktop-viewer"
@@ -167,6 +176,8 @@ export function DesktopCenter() {
           files={exam.problem.files}
           activeId={exam.viewerFileId}
           onOpen={(id) => exam.openFile(id)}
+          attachedIds={exam.attachedFileIds}
+          onAttach={exam.locked ? undefined : (id) => exam.attachFile(id)}
           copyProtection={exam.config.copyProtection}
         />
       </section>

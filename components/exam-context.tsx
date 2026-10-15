@@ -50,6 +50,9 @@ export type ExamApi = {
   saveActive: () => void;
   openFile: (id: string) => void;
   attachFile: (id: string) => void;
+  aiOpen: boolean;
+  openAi: () => void;
+  closeAi: () => void;
   detachFile: (id: string) => void;
   setChatQuestionId: (id: string | null) => void;
   setChatDraft: (value: string) => void;

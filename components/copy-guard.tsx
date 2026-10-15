@@ -24,8 +24,17 @@ export function CopyGuard({
       const selection = window.getSelection();
       if (!selection || selection.rangeCount === 0 || selection.isCollapsed) return;
       const anchor = selection.anchorNode;
-      if (anchor && node.contains(anchor)) selection.removeAllRanges();
+      const focus = selection.focusNode;
+      if ((anchor && node.contains(anchor)) || (focus && node.contains(focus))) selection.removeAllRanges();
     };
+    // Ctrl+A 등으로 페이지 전체를 선택한 뒤 복사해도 보호 영역이 걸쳐 있으면 막는다.
+    const blockCopy = (event: ClipboardEvent) => {
+      const selection = window.getSelection();
+      if (!selection || selection.rangeCount === 0 || selection.isCollapsed) return;
+      if (selection.getRangeAt(0).intersectsNode(node)) event.preventDefault();
+    };
+    document.addEventListener("copy", blockCopy, true);
+    document.addEventListener("cut", blockCopy, true);
     node.addEventListener("selectstart", stop);
     node.addEventListener("contextmenu", stop);
     node.addEventListener("dragstart", stop);
@@ -35,6 +44,8 @@ export function CopyGuard({
       node.removeEventListener("contextmenu", stop);
       node.removeEventListener("dragstart", stop);
       document.removeEventListener("selectionchange", clearSelection);
+      document.removeEventListener("copy", blockCopy, true);
+      document.removeEventListener("cut", blockCopy, true);
     };
   }, [enabled]);
 

@@ -160,6 +160,7 @@ export function ExamApp({ sets: serverSets, buildConfig }: ExamAppProps) {
   const [guard, setGuard] = useState<AiGuardState>(emptyAiGuard);
   const [cooldownNow, setCooldownNow] = useState(0);
   const [mobilePane, setMobilePane] = useState<MobilePane>("work");
+  const [aiOpen, setAiOpen] = useState(true);
   const [tourIndex, setTourIndex] = useState<number | null>(null);
   const [gradeOpen, setGradeOpen] = useState(false);
   const [grading, setGrading] = useState(false);
@@ -966,6 +967,13 @@ export function ExamApp({ sets: serverSets, buildConfig }: ExamAppProps) {
     saveActive,
     openFile,
     attachFile,
+    aiOpen,
+    openAi: () => {
+      setAiOpen(true);
+      setMobilePane("ai");
+      window.setTimeout(() => document.getElementById("chat-draft")?.focus(), 0);
+    },
+    closeAi: () => setAiOpen(false),
     detachFile: (id: string) => setAttachedFileIds((prev) => prev.filter((item) => item !== id)),
     setChatQuestionId: chooseChatQuestion,
     setChatDraft,
@@ -1088,7 +1096,7 @@ export function ExamApp({ sets: serverSets, buildConfig }: ExamAppProps) {
                 </button>
               </div>
             </div>
-            <ExamPanes>
+            <ExamPanes aiOpen={aiOpen}>
               <div className="slot-left">
                 <QuestionRail />
                 <MaterialsPane />

@@ -50,10 +50,14 @@ export function FileBrowser({
   activeId,
   onOpen,
   copyProtection = false,
+  attachedIds = [],
+  onAttach,
 }: {
   files: ExamFile[];
   activeId: string | null;
   onOpen: (id: string) => void;
+  attachedIds?: string[];
+  onAttach?: (id: string) => void;
   copyProtection?: boolean;
 }) {
   const [query, setQuery] = useState("");
@@ -142,6 +146,17 @@ export function FileBrowser({
           <div className="file-stage-bar">
             <strong data-testid="file-preview-name">{active ? active.name : "파일 없음"}</strong>
             <span className="file-stage-tokens">{active ? `${formatTokens(estimateTokens(active.content))} 토큰` : ""}</span>
+            {active && onAttach ? (
+              <button
+                type="button"
+                className="file-full-btn file-attach-btn"
+                data-testid="viewer-attach"
+                disabled={attachedIds.includes(active.id)}
+                onClick={() => onAttach(active.id)}
+              >
+                {attachedIds.includes(active.id) ? "추가됨" : "AI 질문에 추가"}
+              </button>
+            ) : null}
             <button type="button" className="file-full-btn" aria-label={full ? "전체화면 닫기" : "전체화면"} onClick={() => setFull((value) => !value)}>
               {full ? "닫기" : "전체화면"}
             </button>

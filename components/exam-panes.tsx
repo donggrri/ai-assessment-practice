@@ -13,7 +13,7 @@ import {
   writePanelRatio,
 } from "@/lib/panel-split";
 
-export function ExamPanes({ children }: { children: ReactNode }) {
+export function ExamPanes({ children, aiOpen = true }: { children: ReactNode; aiOpen?: boolean }) {
   const panesRef = useRef<HTMLDivElement>(null);
   const ratioRef = useRef(PROBLEM_RATIO_DEFAULT);
   const draggingRef = useRef(false);
@@ -90,8 +90,12 @@ export function ExamPanes({ children }: { children: ReactNode }) {
   return (
     <div
       ref={panesRef}
-      className={`panes${dragging ? " dragging" : ""}`}
-      style={desktop ? { gridTemplateColumns: `${RAIL_WIDTH}px ${split.primary}px ${split.secondary}px` } : undefined}
+      className={`panes${dragging ? " dragging" : ""}${aiOpen ? "" : " ai-closed"}`}
+      style={
+        desktop
+          ? { gridTemplateColumns: aiOpen ? `${RAIL_WIDTH}px ${split.primary}px ${split.secondary}px` : `${RAIL_WIDTH}px minmax(0, 1fr)` }
+          : undefined
+      }
     >
       {children}
       <div

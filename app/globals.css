@@ -1501,3 +1501,17 @@ body.passage-split-dragging, body.passage-split-dragging * { user-select: none !
   .exam-shell.desk-exam .memo-pad textarea { background: #0c1422; color: #e7eef8; }
   .exam-shell.desk-exam .limit-toggle { color: #e7eef8; }
 }
+
+.panes.ai-closed .pane-ai, .panes.ai-closed .ai-resizer { display: none !important; }
+.q-stepper { position: relative; }
+.q-stepper .ai-open-btn { position: absolute; right: 12px; top: 50%; transform: translateY(-50%); }
+.file-attach-btn { margin-left: auto; }
+.file-attach-btn + .file-full-btn { margin-left: 6px; }
+@media (max-width: 1023px) { .ai-close { display: none; } }
+.q-stepper .ai-open-btn { white-space: nowrap; width: auto; writing-mode: horizontal-tb; }
+.ai-close { white-space: nowrap; }
+.exam-shell.desk-exam .ai-close,
+.exam-shell.desk-exam .ai-open-btn { background: #1d2b40; color: #e7eef8; border: 1px solid #33465f; }
+.q-stepper button.ai-open-btn { width: auto; height: 30px; padding: 0 12px; font-size: 13px; font-weight: 700; }
+.ai-head-actions .ai-close { color: #33465f; background: #fff; border: 1px solid var(--line); }
+.exam-shell.desk-exam .ai-head-actions .ai-close { background: #1d2b40; color: #e7eef8; border-color: #33465f; }
