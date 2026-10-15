@@ -1502,7 +1502,7 @@ body.passage-split-dragging, body.passage-split-dragging * { user-select: none !
   .exam-shell.desk-exam .limit-toggle { color: #e7eef8; }
 }
 
-.panes.ai-closed .pane-ai, .panes.ai-closed .ai-resizer { display: none !important; }
+@media (min-width: 1024px) { .panes.ai-closed .pane-ai, .panes.ai-closed .ai-resizer { display: none !important; } }
 .q-stepper { position: relative; }
 .q-stepper .ai-open-btn { position: absolute; right: 12px; top: 50%; transform: translateY(-50%); }
 .file-attach-btn { margin-left: auto; }

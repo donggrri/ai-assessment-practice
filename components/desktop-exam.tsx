@@ -177,7 +177,14 @@ export function DesktopCenter() {
           activeId={exam.viewerFileId}
           onOpen={(id) => exam.openFile(id)}
           attachedIds={exam.attachedFileIds}
-          onAttach={exam.locked ? undefined : (id) => exam.attachFile(id)}
+          onAttach={
+            exam.locked
+              ? undefined
+              : (id) => {
+                  exam.attachFile(id);
+                  if (!exam.aiOpen) exam.openAi();
+                }
+          }
           copyProtection={exam.config.copyProtection}
         />
       </section>

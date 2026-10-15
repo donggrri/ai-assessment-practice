@@ -29,6 +29,9 @@ export function CopyGuard({
     };
     // Ctrl+A 등으로 페이지 전체를 선택한 뒤 복사해도 보호 영역이 걸쳐 있으면 막는다.
     const blockCopy = (event: ClipboardEvent) => {
+      // 메모장·질문 입력창 같은 입력칸에서의 복사는 막지 않는다.
+      const target = event.target;
+      if ((target instanceof HTMLTextAreaElement || target instanceof HTMLInputElement) && !node.contains(target)) return;
       const selection = window.getSelection();
       if (!selection || selection.rangeCount === 0 || selection.isCollapsed) return;
       if (selection.getRangeAt(0).intersectsNode(node)) event.preventDefault();
@@ -52,7 +55,7 @@ export function CopyGuard({
   if (!enabled) return <div className={className}>{children}</div>;
   return (
     <>
-      <style>{".copy-guard,.copy-guard *{-webkit-touch-callout:none}"}</style>
+      <style>{".copy-guard,.copy-guard *{-webkit-touch-callout:none;-webkit-user-select:none;user-select:none}"}</style>
       <div
         ref={ref}
         className={`copy-guard ${className ?? ""}`}
