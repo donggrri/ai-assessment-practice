@@ -1525,3 +1525,43 @@ body.passage-split-dragging, body.passage-split-dragging * { user-select: none !
 }
 .file-tree .file-tree-item:hover > button.file-tree-add, .file-tree .file-tree-item > button.file-tree-add:focus-visible { display: inline-flex; }
 .file-tree .file-tree-item > button.file-tree-add.added { background: #16a34a; border-color: #16a34a; cursor: default; }
+
+/* ---- 실전형 AI 패널 레이아웃 ---- */
+.pane-ai .ai-head { padding: 10px 12px 6px; flex: none; }
+.pane-ai .ai-head-row { position: relative; display: flex; align-items: center; gap: 8px; }
+.pane-ai .ai-head-row h2 { font-size: 15px; margin: 0; }
+.ai-left-badge { display: inline-flex; align-items: center; gap: 5px; padding: 2px 9px; border-radius: 999px; font-size: 12px; font-weight: 600; background: rgba(34,197,94,.12); color: inherit; border: 1px solid rgba(34,197,94,.35); }
+.ai-left-badge i { width: 6px; height: 6px; border-radius: 50%; background: #22c55e; }
+.ai-left-badge.empty i { background: #ef4444; }
+.pane-ai .ai-head-actions { margin-left: auto; }
+.ai-icon-btn { border: 0; background: transparent; color: inherit; font-size: 18px; line-height: 1; padding: 2px 6px; cursor: pointer; border-radius: 6px; opacity: .8; }
+.ai-icon-btn:hover { opacity: 1; background: rgba(127,127,127,.15); }
+.ai-menu-pop { position: absolute; right: 0; top: 30px; z-index: 40; width: 280px; padding: 10px 12px; border-radius: 10px; border: 1px solid var(--line); background: #fff; color: #1f2937; box-shadow: 0 10px 28px rgba(0,0,0,.25); display: flex; flex-direction: column; gap: 6px; font-size: 12px; }
+.ai-menu-pop p { margin: 0; }
+.ai-menu-pop .parts { margin: 0; padding-left: 16px; }
+.ai-menu-note { color: #6b7280; }
+.pane-ai .ai-sub { margin: 2px 0 0; font-size: 12px; color: var(--muted); }
+.pane-ai .thread { flex: 1 1 0; min-height: 0; }
+.pane-ai .composer { max-height: none; overflow: visible; padding: 8px 12px 10px; position: relative; }
+.pane-ai .composer .warn { margin: 0 0 6px; font-size: 12px; }
+.dropup-row { display: flex; gap: 6px; margin-bottom: 6px; }
+.dropup { position: relative; }
+.dropup-btn { font-size: 12px; padding: 3px 8px; border-radius: 6px; border: 1px solid var(--line); background: transparent; color: inherit; cursor: pointer; white-space: nowrap; }
+.dropup-btn b { color: #3b82f6; }
+.dropup-pop { position: absolute; bottom: calc(100% + 4px); left: 0; z-index: 40; list-style: none; margin: 0; padding: 4px; min-width: 240px; max-width: 340px; max-height: 300px; overflow: auto; border-radius: 8px; border: 1px solid var(--line); background: #fff; color: #1f2937; box-shadow: 0 10px 28px rgba(0,0,0,.25); }
+.dropup-pop li button, .dropup-pop li label { display: flex; gap: 6px; width: 100%; text-align: left; border: 0; background: transparent; padding: 6px 8px; font-size: 12px; border-radius: 6px; cursor: pointer; color: inherit; }
+.dropup-pop li button:hover, .dropup-pop li label:hover, .dropup-pop li button.on { background: #eef2ff; }
+.chips.small { margin: 0 0 6px; gap: 4px; }
+.chips.small .chip { font-size: 11px; padding: 1px 6px; }
+.ask-box { position: relative; }
+.pane-ai .ask-box textarea { min-height: 44px; max-height: 160px; padding-right: 40px; resize: none; border-radius: 8px; }
+.ask-send { position: absolute; right: 8px; bottom: 8px; width: 28px; height: 28px; border-radius: 50%; border: 0; background: #3b82f6; color: #fff; font-weight: 800; cursor: pointer; }
+.ask-send:disabled { background: rgba(127,127,127,.35); cursor: default; }
+.pane-ai .chat-hint { margin: 4px 0 0; font-size: 11px; }
+.exam-shell.desk-exam .ai-menu-pop, .exam-shell.desk-exam .dropup-pop { background: #16223a; color: #e7eef8; border-color: #33465f; }
+.exam-shell.desk-exam .ai-menu-note { color: #93a4bb; }
+.exam-shell.desk-exam .dropup-pop li button:hover, .exam-shell.desk-exam .dropup-pop li label:hover, .exam-shell.desk-exam .dropup-pop li button.on { background: #24344c; }
+.exam-shell.desk-exam .pane-ai .composer { background: transparent; }
+.pane-ai .composer .warn { padding: 3px 8px; }
+.pane-ai .ai-head .ai-sub { margin-top: 0; }
+.cooldown-tag { margin-left: auto; align-self: center; font-size: 11px; color: #f59e0b; white-space: nowrap; }
