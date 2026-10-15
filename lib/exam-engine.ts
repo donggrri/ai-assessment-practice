@@ -2,7 +2,7 @@ import { decideChat } from "./chat-policy";
 import { buildModelMessages, type ModelTurn } from "./chat-thread";
 import { composeModelContent, type ChatContentPart } from "./file-attachment";
 import { gradeProblemSet } from "./grading";
-import { completeChat, isImageUnsupportedError, ModelRequestError } from "./llm";
+import { completeChat, isImageUnsupportedError, MODEL_TIMEOUT_MS, ModelRequestError } from "./llm";
 import { isMockMode, normalizeLlmSettings, type LlmSettings } from "./llm-settings";
 import { buildMockReply } from "./mock-ai";
 import { toPublicProblemSet, toSummary } from "./public-problem";
@@ -54,6 +54,13 @@ const EMPTY_MODEL_MESSAGE = "모델 응답이 비어 있습니다.";
 function userFacingModelError(error: unknown): string {
   if (error instanceof ModelRequestError) return error.message;
   if (error instanceof Error && error.message === EMPTY_MODEL_MESSAGE) return error.message;
+  if (error instanceof DOMException && (error.name === "TimeoutError" || error.name === "AbortError")) {
+    return `모델 응답 시간 초과(${Math.round(MODEL_TIMEOUT_MS / 1000)}초). 질문 횟수는 차감되지 않았습니다. 질문을 나누거나 다시 시도하세요.`;
+  }
+  if (error instanceof TypeError) {
+    return `네트워크 오류로 모델에 연결하지 못했습니다(${error.message}). 질문 횟수는 차감되지 않았습니다.`;
+  }
+  if (error instanceof Error && error.message) return `${MODEL_FAIL_MESSAGE} (${error.message.slice(0, 200)})`;
   return MODEL_FAIL_MESSAGE;
 }
 

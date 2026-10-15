@@ -264,3 +264,48 @@ describe("completeChat", () => {
     );
   });
 });
+
+describe("completeChat 안정성", () => {
+  it("gpt-5 계열은 temperature 를 보내지 않는다", async () => {
+    let sent: Record<string, unknown> = {};
+    await completeChat({
+      baseUrl: "https://openrouter.ai/api/v1",
+      apiKey: "k",
+      model: "openai/gpt-5.2",
+      content: "q",
+      fetchImpl: (async (_url: string, init: RequestInit) => {
+        sent = JSON.parse(String(init.body));
+        return new Response(JSON.stringify({ choices: [{ message: { content: "ok" } }] }), { status: 200 });
+      }) as unknown as typeof fetch,
+    });
+    assert.equal("temperature" in sent, false);
+  });
+  it("429 는 재시도하고, 200 본문의 error 는 원인을 보여 준다", async () => {
+    let calls = 0;
+    const reply = await completeChat({
+      baseUrl: "https://openrouter.ai/api/v1",
+      apiKey: "k",
+      model: "openai/gpt-5.2",
+      content: "q",
+      retryDelaysMs: [1, 1],
+      fetchImpl: (async () => {
+        calls += 1;
+        if (calls === 1) return new Response("{}", { status: 429 });
+        return new Response(JSON.stringify({ choices: [{ message: { content: "done" } }] }), { status: 200 });
+      }) as unknown as typeof fetch,
+    });
+    assert.equal(reply, "done");
+    await assert.rejects(
+      completeChat({
+        baseUrl: "https://openrouter.ai/api/v1",
+        apiKey: "k",
+        model: "openai/gpt-5.2",
+        content: "q",
+        retryDelaysMs: [],
+        fetchImpl: (async () =>
+          new Response(JSON.stringify({ error: { code: 400, message: "bad param" } }), { status: 200 })) as unknown as typeof fetch,
+      }),
+      /bad param/,
+    );
+  });
+});

@@ -191,7 +191,7 @@ describe("createExamEngine", () => {
     assert.equal(rejected.ok, false);
     if (rejected.ok) return;
     assert.equal(rejected.error, "model_error");
-    assert.equal(rejected.message, modelFailMessage);
+    assert.ok(rejected.message.startsWith(modelFailMessage));
     assert.equal("requestsUsed" in rejected, false);
 
     const statusEngine = createExamEngine({
