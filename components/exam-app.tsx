@@ -1,7 +1,7 @@
 "use client";
 
 import { useCallback, useEffect, useLayoutEffect, useMemo, useRef, useState } from "react";
-import { chatSystemPrompt, groupThreadId, historyFromChat, rememberedTurnCount, threadUsage, trimChatMessages } from "@/lib/chat-thread";
+import { chatSystemPrompt, groupThreadId, newAttemptMessages, historyFromChat, rememberedTurnCount, threadUsage, trimChatMessages } from "@/lib/chat-thread";
 import { measureContext } from "@/lib/context";
 import { createExamEngine } from "@/lib/exam-engine";
 import {
@@ -233,7 +233,8 @@ export function ExamApp({ sets: serverSets, buildConfig }: ExamAppProps) {
         setSaved(stored?.saved ?? {});
         setDrafts(stored?.drafts ?? {});
         setViewerFileId(stored?.viewerFileId && fileIds.has(stored.viewerFileId) ? stored.viewerFileId : null);
-        setAttachedFileIds((stored?.attachedFileIds ?? []).filter((fileId) => fileIds.has(fileId)));
+        // 첨부는 그 질문에만 쓰이므로 다시 열 때 복원하지 않는다.
+        setAttachedFileIds([]);
         const activeId =
           stored?.activeQuestionId && questionIds.has(stored.activeQuestionId)
             ? stored.activeQuestionId
@@ -321,7 +322,7 @@ export function ExamApp({ sets: serverSets, buildConfig }: ExamAppProps) {
       setViewerFileId(
         stored?.viewerFileId && fileIds.has(stored.viewerFileId) ? stored.viewerFileId : (pub.files[0]?.id ?? null),
       );
-      setAttachedFileIds((stored?.attachedFileIds ?? []).filter((fileId) => fileIds.has(fileId)));
+      setAttachedFileIds([]);
       setChatQuestionId(stored?.chatQuestionId && questionIds.has(stored.chatQuestionId) ? stored.chatQuestionId : active);
       const storedThreads = stored?.threads;
       if (storedThreads && Object.keys(storedThreads).length > 0) {
@@ -805,18 +806,12 @@ export function ExamApp({ sets: serverSets, buildConfig }: ExamAppProps) {
     }
     setActiveQuestionId(problem.questions[0].id);
     setChatQuestionId(problem.questions[0].id);
+    setAttachedFileIds([]);
     if (setId === "live") {
       setThreads({});
     } else if (setId) {
-      writeGroup(setId, (prev) => [
-        ...prev,
-        {
-          id: crypto.randomUUID(),
-          role: "system",
-          content: "새 응시를 시작했습니다. 이전 대화는 삭제하지 않았고, AI 질문 횟수만 다시 채워졌습니다.",
-          createdAt: new Date().toISOString(),
-        },
-      ]);
+      // 새 응시는 이 세트의 저장된 대화 기록도 지운다.
+      writeGroup(setId, newAttemptMessages(crypto.randomUUID(), new Date().toISOString()));
     }
     setNewAttemptOpen(false);
   }

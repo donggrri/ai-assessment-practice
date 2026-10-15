@@ -94,3 +94,10 @@ export function threadUsage(parts: readonly string[]): { chars: number; tokens: 
   for (const part of parts) chars += part.length;
   return { chars, tokens: estimateTokens(parts.join("")) };
 }
+
+export const NEW_ATTEMPT_NOTICE = "새 응시를 시작했습니다. 이전 대화 기록과 AI 질문 횟수를 초기화했습니다.";
+
+/** 새 응시를 시작하면 이전 대화는 버리고 안내 한 줄만 남긴다. 첨부는 기록에 없다. */
+export function newAttemptMessages(id: string, createdAt: string): { id: string; role: "system"; content: string; createdAt: string }[] {
+  return [{ id, role: "system", content: NEW_ATTEMPT_NOTICE, createdAt }];
+}

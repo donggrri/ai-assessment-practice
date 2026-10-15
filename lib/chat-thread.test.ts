@@ -8,6 +8,7 @@ import {
   enterSends,
   groupThreadId,
   historyFromChat,
+  newAttemptMessages,
   rememberedTurnCount,
   threadUsage,
   trimChatMessages,
@@ -124,5 +125,25 @@ describe("리뷰 반영", () => {
     assert.equal(turns.length, 20);
     assert.equal(turns[0].content, "q1");
     assert.equal(rememberedTurnCount(msgs), 10);
+  });
+});
+
+describe("대화 기록 저장", () => {
+  it("새 응시는 이전 대화를 버리고 안내만 남기며, 기억 턴은 0이다", () => {
+    const fresh = newAttemptMessages("n1", "2026-10-16T00:00:00Z");
+    assert.equal(fresh.length, 1);
+    assert.equal(fresh[0].role, "system");
+    assert.equal(rememberedTurnCount(fresh), 0);
+    assert.deepEqual(historyFromChat(fresh), []);
+  });
+  it("저장본을 다시 불러와도 최근 10턴만 남고 첨부 본문은 사라진다", () => {
+    const saved = Array.from({ length: 12 }, (_, i) => [
+      { role: "user", content: `q${i}`, modelContent: `FILE${i}`, meta: { fileNames: ["a.pdf"] } },
+      { role: "assistant", content: `a${i}` },
+    ]).flat();
+    const restored = trimChatMessages(saved);
+    assert.equal(restored.filter((m) => m.role === "user").length, 10);
+    assert.equal(JSON.stringify(restored).includes("FILE"), false);
+    assert.equal(restored[0].content, "q2");
   });
 });
