@@ -255,8 +255,10 @@ class OfficialPdf(FPDF):
                 weights.append(0.7)
             elif key in {"claim", "ingredients", "라벨 문구", "성분·함량", "drink", "음료", "비고"}:
                 weights.append(1.7)
-            elif key in {"submitted", "제출시각"}:
+            elif key in {"submitted", "제출시각", "접수시각"}:
                 weights.append(1.45)
+            elif key == "본문":
+                weights.append(3.4)
             else:
                 weights.append(1)
         total = sum(weights) or 1
@@ -295,7 +297,7 @@ class OfficialPdf(FPDF):
         span = sum(widths[:-1]) if len(widths) > 1 else widths[0]
         last = widths[-1] if len(widths) > 1 else 0
         for key in order:
-            if self.get_y() > self.h - 16:
+            if self.get_y() + 7 > self.h - 16:
                 self.add_page()
             y = self.get_y()
             name = key if key else "빈 값"
@@ -314,7 +316,7 @@ class OfficialPdf(FPDF):
         self.ln(2)
 
     def _table_header(self, labels: list[str], widths: list[float]) -> None:
-        if self.get_y() > self.h - 22:
+        if self.get_y() + 15 > self.h - 16:
             self.add_page()
         y = self.get_y()
         x = self.l_margin
@@ -329,13 +331,16 @@ class OfficialPdf(FPDF):
         self.set_xy(self.l_margin, y + 7.2)
 
     def _table_row(self, cells: list[str], widths: list[float], zebra: bool) -> None:
-        if self.get_y() > self.h - 18:
+        if self.get_y() + 7 > self.h - 16:
             self.add_page()
         y = self.get_y()
         x = self.l_margin
         fill = ZEBRA if zebra else WHITE
         self.set_draw_color(*LINE)
         self.set_font("wqy", size=8)
+        if any(not self._fits(text, width, 7) for text, width in zip(cells, widths)):
+            self._wrapped_row(cells, widths, fill)
+            return
         for text, width in zip(cells, widths):
             shown = text
             size = 8
@@ -349,8 +354,28 @@ class OfficialPdf(FPDF):
             x += width
         self.set_xy(self.l_margin, y + 6.6)
 
+    def _wrapped_row(self, cells: list[str], widths: list[float], fill: tuple[int, int, int]) -> None:
+        size, line_h = 7, 4.2
+        self.set_font("wqy", size=size)
+        wrapped = [self.multi_cell(width - 1.6, line_h, text, split_only=True) or [""] for text, width in zip(cells, widths)]
+        height = max(len(lines) for lines in wrapped) * line_h + 2.4
+        if self.get_y() + height > self.h - 16:
+            self.add_page()
+        y = self.get_y()
+        x = self.l_margin
+        self.set_draw_color(*LINE)
+        self.set_fill_color(*fill)
+        self.set_text_color(*INK)
+        for lines, width in zip(wrapped, widths):
+            self.rect(x, y, width, height, style="FD")
+            for index, line in enumerate(lines):
+                self.set_xy(x + 0.8, y + 1.2 + index * line_h)
+                self.cell(width - 1.6, line_h, line)
+            x += width
+        self.set_xy(self.l_margin, y + height)
+
     def _subtotal(self, label: str, count: int, widths: list[float]) -> None:
-        if self.get_y() > self.h - 16:
+        if self.get_y() + 7 > self.h - 16:
             self.add_page()
         y = self.get_y()
         self.set_fill_color(*SUB)
@@ -364,7 +389,7 @@ class OfficialPdf(FPDF):
 
 def _group_index(headers: list[str]) -> int | None:
     keys = [header.strip().lower() for header in headers]
-    for name in ("inspector", "department", "검수자", "부서", "창고", "사업장"):
+    for name in ("inspector", "department", "검수자", "부서", "창고", "사업장", "공급사", "시스템", "언어", "팀"):
         if name in keys:
             return keys.index(name)
     return None
@@ -416,6 +441,24 @@ def _section_name(label: str) -> str:
         "CATALOG": "과정",
         "MEMO": "점검 메모",
         "FEATURES": "기능",
+        "THRESHOLDS": "판정 기준",
+        "EXPENSE": "비목 기준",
+        "FX": "환율",
+        "PROJECTS": "과제",
+        "VOUCHERS": "집행 전표",
+        "CALENDAR": "휴무일",
+        "LOGS": "근태 기록",
+        "AMENDS": "정정 신청",
+        "SUPPLIERS": "공급사",
+        "ORDERS": "발주·입고",
+        "SYSTEMS": "시스템",
+        "RECORDS": "추출 레코드",
+        "REMASKED": "재처리 완료",
+        "KEYWORDS": "분류 키워드",
+        "CUSTOMERS": "고객",
+        "INQUIRIES": "접수 문의",
+        "CHAMBERS": "챔버",
+        "READINGS": "센서 로그",
         "lead": "본문",
     }
     return names.get(label, label)
