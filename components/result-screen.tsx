@@ -4,10 +4,12 @@ import type { GradeReport } from "@/lib/types";
 
 export function ResultScreen({
   report,
+  timeReport = null,
   onReview,
   onNewAttempt,
 }: {
   report: GradeReport;
+  timeReport?: GradeReport | null;
   onReview: () => void;
   onNewAttempt: () => void;
 }) {
@@ -22,6 +24,11 @@ export function ResultScreen({
           <p>
             {report.correctCount} / {report.total} 맞음
           </p>
+          {timeReport ? (
+            <p className="time-score" data-testid="time-score">
+              시간 내 점수 {timeReport.score}점 ({timeReport.correctCount}/{timeReport.total}) · 최종 점수 {report.score}점
+            </p>
+          ) : null}
         </div>
         <div className="result-actions">
           <button type="button" className="btn" onClick={onReview}>

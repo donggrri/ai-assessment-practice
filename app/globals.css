@@ -1585,3 +1585,5 @@ body.passage-split-dragging, body.passage-split-dragging * { user-select: none !
 .ai-left-badge.empty { background: rgba(239,68,68,.12); border-color: rgba(239,68,68,.4); }
 .live-timer.overtime, .exam-shell .live-timer.overtime { color: #fff !important; background: #dc2626 !important; border-color: #b91c1c !important; }
 .live-timer.overtime { padding: 2px 8px; border-radius: 999px; border: 1px solid #b91c1c; font-weight: 700; }
+.time-score { margin-top: 6px; font-weight: 700; color: #dc2626; }
+.time-score-pill { align-self: center; padding: 3px 10px; border-radius: 999px; background: #dc2626; color: #fff; font-size: 12px; font-weight: 700; white-space: nowrap; }

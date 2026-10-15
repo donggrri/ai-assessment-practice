@@ -153,6 +153,7 @@ export function ExamApp({ sets: serverSets, buildConfig }: ExamAppProps) {
   const [setLeft, setSetLeft] = useState(0);
   /** 단독 세트 제한 시간을 넘긴 시간. 막지 않고 표시만 한다. */
   const [setOverMs, setSetOverMs] = useState(0);
+  const [timeReport, setTimeReport] = useState<GradeReport | null>(null);
   const [sourceTitle, setSourceTitle] = useState("");
   const [hydrated, setHydrated] = useState(false);
   const [chatDraft, setChatDraft] = useState("");
@@ -244,6 +245,7 @@ export function ExamApp({ sets: serverSets, buildConfig }: ExamAppProps) {
         setThreads({ [id]: trimChatMessages(Array.isArray(stored?.messages) ? stored.messages : []) });
         setRequestsUsed(typeof stored?.requestsUsed === "number" ? stored.requestsUsed : 0);
         setReport(stored?.report ?? null);
+        setTimeReport(stored?.timeReport ?? null);
         setReviewIds(Array.isArray(stored?.reviewIds) ? stored.reviewIds : []);
         setView(stored?.view === "result" ? "result" : "exam");
         setLivePaper([]);
@@ -494,6 +496,7 @@ export function ExamApp({ sets: serverSets, buildConfig }: ExamAppProps) {
       view,
       reviewIds,
       ...(setStartedAt != null ? { startedAt: setStartedAt } : {}),
+      timeReport,
     });
   }, [
     hydrated,
@@ -513,6 +516,7 @@ export function ExamApp({ sets: serverSets, buildConfig }: ExamAppProps) {
     livePaper,
     liveStartedAt,
     setStartedAt,
+    timeReport,
   ]);
 
   const measurement = useMemo(() => {
@@ -537,7 +541,8 @@ export function ExamApp({ sets: serverSets, buildConfig }: ExamAppProps) {
   }, [problem, chatQuestionId, attachedFileIds, chatDraft, config]);
 
   const remaining = config ? remainingRequests(requestsUsed, config.aiRequestLimit) : 0;
-  const locked = report != null;
+  // 단독 세트에서 시간이 끝나 자동 채점된 뒤에는 잠그지 않고 계속 고쳐 다시 제출할 수 있다.
+  const locked = report != null && timeReport == null;
 
   function openSettings() {
     setSettingsDraft(loadLlmSettings());
@@ -775,6 +780,7 @@ export function ExamApp({ sets: serverSets, buildConfig }: ExamAppProps) {
     setSaved({});
     setDrafts({});
     setReport(null);
+    setTimeReport(null);
     setReviewIds([]);
     setView("exam");
     setRequestsUsed(0);
@@ -830,8 +836,21 @@ export function ExamApp({ sets: serverSets, buildConfig }: ExamAppProps) {
   }, [strictConstraints, guard.cooldownUntil]);
 
   const setLimitMs = (problem?.timeLimitMin ?? 0) * 60_000;
+  // 25분 등 세트 제한 시간이 끝나면 그 순간 답으로 한 번만 자동 채점한다. 화면은 잠그지 않는다.
+  const autoGradeRef = useRef<() => void>(() => undefined);
   useEffect(() => {
-    if (screen !== "exam" || report) return;
+    autoGradeRef.current = () => {
+      if (!hydrated || setId === "live" || !problem || !engine) return;
+      if (timeReport != null || report != null) return;
+      const data = engine.grade(problem.id, mergedAnswers());
+      if ("error" in data) return;
+      recordBestScore(problem.id, { score: data.score, correctCount: data.correctCount, total: data.total }, localStorage);
+      setTimeReport(data);
+    };
+  });
+  useEffect(() => {
+    if (screen !== "exam") return;
+    if (report && (setId === "live" || timeReport == null)) return;
     if (setId === "live") {
       if (liveStartedAt == null) return;
       const timer = window.setInterval(() => {
@@ -847,9 +866,10 @@ export function ExamApp({ sets: serverSets, buildConfig }: ExamAppProps) {
       const now = Date.now();
       setSetLeft(remainingLiveMs(setStartedAt, now, setLimitMs));
       setSetOverMs(Math.max(0, now - setStartedAt - setLimitMs));
+      if (now - setStartedAt >= setLimitMs) autoGradeRef.current();
     }, 250);
     return () => window.clearInterval(timer);
-  }, [screen, setId, liveStartedAt, setStartedAt, setLimitMs, report]);
+  }, [screen, setId, liveStartedAt, setStartedAt, setLimitMs, report, timeReport]);
 
   function startTour() {
     setView("exam");
@@ -957,6 +977,7 @@ export function ExamApp({ sets: serverSets, buildConfig }: ExamAppProps) {
     threadTokens: thread.tokens,
     requestsUsed,
     report,
+    timeReport,
     sending,
     chatError,
     chatDraft,
@@ -1012,7 +1033,7 @@ export function ExamApp({ sets: serverSets, buildConfig }: ExamAppProps) {
 
   const settingsInsecure = isInsecureRemoteHttp(settingsDraft.baseUrl);
   const clockLabel =
-    report != null
+    report != null && (setId === "live" || timeReport == null)
       ? null
       : setId === "live"
         ? formatTimer(liveLeft)
@@ -1021,7 +1042,7 @@ export function ExamApp({ sets: serverSets, buildConfig }: ExamAppProps) {
             ? `시간 초과 +${formatElapsed(setOverMs)}`
             : formatTimer(setLeft)
           : null;
-  const clockOver = report == null && setId !== "live" && setStartedAt != null && setLimitMs > 0 && setLeft === 0;
+  const clockOver = (report == null || timeReport != null) && setId !== "live" && setStartedAt != null && setLimitMs > 0 && setLeft === 0;
   const clockTestId = setId === "live" ? "live-timer" : "set-timer";
 
   return (
@@ -1079,7 +1100,7 @@ export function ExamApp({ sets: serverSets, buildConfig }: ExamAppProps) {
           </div>
         </header>
         {view === "result" && report ? (
-          <ResultScreen report={report} onReview={() => setView("exam")} onNewAttempt={() => setNewAttemptOpen(true)} />
+          <ResultScreen report={report} timeReport={timeReport} onReview={() => setView("exam")} onNewAttempt={() => setNewAttemptOpen(true)} />
         ) : (
           <>
             <div className="crumb-bar desktop-exam">

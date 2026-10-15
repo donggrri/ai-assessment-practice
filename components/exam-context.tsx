@@ -29,6 +29,7 @@ export type ExamApi = {
   threadTokens: number;
   requestsUsed: number;
   report: GradeReport | null;
+  timeReport: GradeReport | null;
   sending: boolean;
   chatError: string | null;
   chatDraft: string;

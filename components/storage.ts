@@ -15,6 +15,8 @@ export type ExamPersist = {
   reviewIds?: string[];
   /** 제한 시간이 있는 세트를 연 시각. 없으면 타이머가 없는 세트다. */
   startedAt?: number;
+  /** 제한 시간이 끝난 순간 자동 채점한 결과. 한 번만 만든다. */
+  timeReport?: GradeReport | null;
 };
 
 export function storageKey(setId: string): string {
