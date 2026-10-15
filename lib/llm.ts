@@ -61,8 +61,16 @@ function readErrorMessage(value: unknown): string | null {
   const error = (value as { error?: unknown }).error;
   if (typeof error === "string" && error.trim() !== "") return error.trim();
   if (typeof error === "object" && error !== null) {
-    const message = (error as { message?: unknown }).message;
-    if (typeof message === "string" && message.trim() !== "") return message.trim();
+    const record = error as Record<string, unknown>;
+    for (const key of ["message", "detail"]) {
+      const value = record[key];
+      if (typeof value === "string" && value.trim() !== "") return value.trim();
+    }
+    try {
+      return JSON.stringify(error).slice(0, 300);
+    } catch {
+      return "알 수 없는 오류";
+    }
   }
   return null;
 }
@@ -88,11 +96,20 @@ export function acceptsTemperature(model: string): boolean {
 
 function sleep(ms: number, signal?: AbortSignal): Promise<void> {
   return new Promise((resolve, reject) => {
-    const timer = setTimeout(resolve, ms);
-    signal?.addEventListener("abort", () => {
+    const reason = () => signal?.reason ?? new DOMException("The operation was aborted.", "AbortError");
+    if (signal?.aborted) {
+      reject(reason());
+      return;
+    }
+    const onAbort = () => {
       clearTimeout(timer);
-      reject(new DOMException("The operation was aborted.", "AbortError"));
-    });
+      reject(reason());
+    };
+    const timer = setTimeout(() => {
+      signal?.removeEventListener("abort", onAbort);
+      resolve();
+    }, ms);
+    signal?.addEventListener("abort", onAbort, { once: true });
   });
 }
 
@@ -179,8 +196,13 @@ export async function completeChat(input: {
     // OpenRouter 는 200 응답 본문에 error 를 담아 보내기도 한다.
     const bodyError = readErrorMessage(data);
     if (bodyError) {
-      const code = (data.error as { code?: unknown } | undefined)?.code;
-      const status = typeof code === "number" ? code : 502;
+      const rawCode = (data.error as { code?: unknown } | undefined)?.code;
+      const numeric = typeof rawCode === "number" ? rawCode : Number(rawCode);
+      const status = Number.isFinite(numeric) && numeric > 0
+        ? numeric
+        : typeof rawCode === "string" && /rate.?limit/i.test(rawCode)
+          ? 429
+          : 400;
       if (RETRY_STATUSES.has(status) && attempt < retryDelays.length) {
         await sleep(retryDelays[attempt], signal);
         continue;
@@ -192,6 +214,9 @@ export async function completeChat(input: {
     if (text === "") {
       const refusal = typeof choice?.message?.refusal === "string" ? choice.message.refusal : "";
       if (refusal) throw new ModelRequestError(200, `모델이 답변을 거절했습니다: ${refusal.slice(0, 200)}`);
+      if (choice?.finish_reason === "content_filter") {
+        throw new ModelRequestError(200, "안전 정책(콘텐츠 필터)에 의해 답변이 차단되었습니다.");
+      }
       if (choice?.finish_reason === "length") {
         throw new ModelRequestError(200, "출력 길이 한도에 걸려 빈 응답이 왔습니다. 질문을 나눠 다시 보내세요.");
       }

@@ -54,7 +54,10 @@ const EMPTY_MODEL_MESSAGE = "모델 응답이 비어 있습니다.";
 function userFacingModelError(error: unknown): string {
   if (error instanceof ModelRequestError) return error.message;
   if (error instanceof Error && error.message === EMPTY_MODEL_MESSAGE) return error.message;
-  if (error instanceof DOMException && (error.name === "TimeoutError" || error.name === "AbortError")) {
+  if (error instanceof Error && error.name === "AbortError") {
+    return "요청이 취소되었습니다. 질문 횟수는 차감되지 않았습니다.";
+  }
+  if (error instanceof Error && error.name === "TimeoutError") {
     return `모델 응답 시간 초과(${Math.round(MODEL_TIMEOUT_MS / 1000)}초). 질문 횟수는 차감되지 않았습니다. 질문을 나누거나 다시 시도하세요.`;
   }
   if (error instanceof TypeError) {
