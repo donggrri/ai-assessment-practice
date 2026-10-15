@@ -1515,3 +1515,13 @@ body.passage-split-dragging, body.passage-split-dragging * { user-select: none !
 .q-stepper button.ai-open-btn { width: auto; height: 30px; padding: 0 12px; font-size: 13px; font-weight: 700; }
 .ai-head-actions .ai-close { color: #33465f; background: #fff; border: 1px solid var(--line); }
 .exam-shell.desk-exam .ai-head-actions .ai-close { background: #1d2b40; color: #e7eef8; border-color: #33465f; }
+
+.file-tree-item { position: relative; }
+.file-tree .file-tree-item > button.file-tree-add {
+  position: absolute; right: 64px; top: 50%; margin: 0; min-height: 0; transform: translateY(-50%);
+  width: 22px; height: 22px; border-radius: 50%; border: 1px solid #3b82f6;
+  background: #2563eb; color: #fff; font-weight: 800; font-size: 14px; line-height: 1;
+  display: none; align-items: center; justify-content: center; cursor: pointer; padding: 0;
+}
+.file-tree .file-tree-item:hover > button.file-tree-add, .file-tree .file-tree-item > button.file-tree-add:focus-visible { display: inline-flex; }
+.file-tree .file-tree-item > button.file-tree-add.added { background: #16a34a; border-color: #16a34a; cursor: default; }

@@ -86,7 +86,7 @@ export function FileBrowser({
     const folder = !node.fileId;
     const open = !collapsed[node.id];
     return (
-      <div key={node.id}>
+      <div key={node.id} className="file-tree-item">
         <button
           type="button"
           role="treeitem"
@@ -108,6 +108,19 @@ export function FileBrowser({
           <span className="file-tree-name">{node.name}</span>
           <span className="file-tree-tokens">{node.tokens != null ? formatTokens(node.tokens) : ""}</span>
         </button>
+        {node.fileId && onAttach ? (
+          <button
+            type="button"
+            className={`file-tree-add${attachedIds.includes(node.fileId) ? " added" : ""}`}
+            data-testid="tree-attach"
+            aria-label={`${node.name} AI 질문에 추가`}
+            title={attachedIds.includes(node.fileId) ? "추가됨" : "AI 질문에 추가"}
+            disabled={attachedIds.includes(node.fileId)}
+            onClick={() => node.fileId && onAttach(node.fileId)}
+          >
+            {attachedIds.includes(node.fileId) ? "✓" : "+"}
+          </button>
+        ) : null}
         {folder && open ? node.children.map((child) => renderNode(child, depth + 1)) : null}
       </div>
     );
