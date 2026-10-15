@@ -14,6 +14,7 @@ import {
 import { loadBestScore, recordBestScore } from "@/lib/best-score";
 import {
   buildLivePaper,
+  formatElapsed,
   formatTimer,
   gradeLivePaper,
   liveQuestions,
@@ -1016,11 +1017,11 @@ export function ExamApp({ sets: serverSets, buildConfig }: ExamAppProps) {
       : setId === "live"
         ? formatTimer(liveLeft)
         : setStartedAt != null && setLimitMs > 0
-          ? setOverMs > 0
-            ? `시간 초과 +${formatTimer(setOverMs)}`
+          ? setLeft === 0
+            ? `시간 초과 +${formatElapsed(setOverMs)}`
             : formatTimer(setLeft)
           : null;
-  const clockOver = report == null && setId !== "live" && setStartedAt != null && setLimitMs > 0 && setOverMs > 0;
+  const clockOver = report == null && setId !== "live" && setStartedAt != null && setLimitMs > 0 && setLeft === 0;
   const clockTestId = setId === "live" ? "live-timer" : "set-timer";
 
   return (

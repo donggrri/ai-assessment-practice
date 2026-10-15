@@ -48,6 +48,12 @@ export function formatTimer(ms: number): string {
   return `${String(minutes).padStart(2, "0")}:${String(seconds).padStart(2, "0")}`;
 }
 
+/** 경과 시간(올라가는 시계)은 내림으로 센다. */
+export function formatElapsed(ms: number): string {
+  const total = Math.max(0, Math.floor(ms / 1000));
+  return `${String(Math.floor(total / 60)).padStart(2, "0")}:${String(total % 60).padStart(2, "0")}`;
+}
+
 export function remainingLiveMs(startedAt: number, now: number, duration = LIVE_DURATION_MS): number {
   if (!Number.isFinite(startedAt) || !Number.isFinite(now)) return 0;
   return Math.max(0, startedAt + duration - now);
